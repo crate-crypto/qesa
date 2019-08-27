@@ -25,10 +25,10 @@ pub struct NoZK {
 // This implementation will intentionally try to mirror the dalek-cryptography implementation in design choices and variable naming
 pub fn create(
     transcript: &mut Transcript,
-    Q: &RistrettoPoint,
-    P: RistrettoPoint,
     mut G_Vec: Vec<RistrettoPoint>,
     mut H_Vec: Vec<RistrettoPoint>,
+    Q: &RistrettoPoint,
+    P: RistrettoPoint,
     mut a_vec: Vec<Scalar>,
     mut b_vec: Vec<Scalar>,
 ) -> NoZK {
@@ -115,13 +115,13 @@ pub fn create(
 
 pub fn verify(
     transcript: &mut Transcript,
+    G_Vec: &[RistrettoPoint],
+    H_Vec: &[RistrettoPoint],
+    Q: &RistrettoPoint,
     n: usize,
     proof: NoZK,
     P: RistrettoPoint,
-    Q: &RistrettoPoint,
     t: Scalar,
-    G_Vec: &[RistrettoPoint],
-    H_Vec: &[RistrettoPoint],
 ) {
     let mut G = G_Vec.to_owned();
     let mut H = H_Vec.to_owned();
@@ -222,11 +222,11 @@ mod tests {
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
-        let proof = create(&mut transcript, &Q, P, G.clone(), H.clone(), a, b);
+        let proof = create(&mut transcript, G.clone(), H.clone(), &Q, P, a, b);
 
         transcript = Transcript::new(b"ip_no_zk");
 
-        verify(&mut transcript, n, proof, P, &Q, t, &G, &H);
+        verify(&mut transcript, &G, &H, &Q, n, proof, P, t);
     }
 
     fn helper_dot_product(n: usize) -> (Vec<Scalar>, Vec<Scalar>, Scalar) {

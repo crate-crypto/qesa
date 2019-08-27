@@ -26,7 +26,7 @@ pub struct NoZK {
 pub fn create(
     transcript: &mut Transcript,
     Q: &RistrettoPoint,
-    C: RistrettoPoint,
+    P: RistrettoPoint,
     mut G_Vec: Vec<RistrettoPoint>,
     mut H_Vec: Vec<RistrettoPoint>,
     mut a_vec: Vec<Scalar>,
@@ -37,15 +37,26 @@ pub fn create(
     let mut G = &mut G_Vec[..];
     let mut H = &mut H_Vec[..];
 
-    let mut L_vec: Vec<CompressedRistretto> = Vec::new();
-    let mut R_vec: Vec<CompressedRistretto> = Vec::new();
-
     let mut n = G.len();
 
-    // transcript.append_u64(b"should be a power of two", n as u64);
-    // We add the compressed point to the transcript, because we need to generate alpha
-    // If this is not done, then the prover always will be able to predict what the first challenge will be 
-    transcript.append_message(b"c", C.compress().as_bytes());
+    // All of the input vectors must have the same length.
+    assert_eq!(G.len(), n);
+    assert_eq!(H.len(), n);
+    assert_eq!(a.len(), n);
+    assert_eq!(b.len(), n);
+
+    // All of the input vectors must have a length that is a power of two.
+    assert!(n.is_power_of_two());
+
+    transcript.append_u64(b"n", n as u64);
+
+    let lg_n = n.next_power_of_two().trailing_zeros() as usize;
+    let mut L_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
+    let mut R_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
+
+    // We add the compressed point to the transcript, because we need some non-trivial input to generate alpha
+    // If this is not done, then the prover always will be able to predict what the first challenge will be
+    transcript.append_message(b"p", P.compress().as_bytes());
 
     let alpha = transcript.challenge_scalar(b"alpha");
     let Q = alpha.invert() * Q;
@@ -104,14 +115,14 @@ pub fn create(
 
 pub fn verify(
     transcript: &mut Transcript,
+    n: usize,
     proof: NoZK,
-    C: RistrettoPoint,
+    P: RistrettoPoint,
     Q: &RistrettoPoint,
     t: Scalar,
     G_Vec: &[RistrettoPoint],
     H_Vec: &[RistrettoPoint],
 ) {
-
     let mut G = G_Vec.to_owned();
     let mut H = H_Vec.to_owned();
 
@@ -125,22 +136,23 @@ pub fn verify(
         .iter()
         .map(|R| R.decompress().unwrap())
         .collect();
+    assert_eq!(n, 1 << Ls.len());
 
     let mut n = 1 << Ls.len();
 
-    transcript.append_message(b"c", C.compress().as_bytes());
+    transcript.append_u64(b"n", n as u64);
+    transcript.append_message(b"p", P.compress().as_bytes());
 
     let alpha = transcript.challenge_scalar(b"alpha");
-
     let Q = alpha.invert() * Q;
 
-    let mut C = C - (alpha - Scalar::one()) * t * Q;
+    let mut P = P - (alpha - Scalar::one()) * t * Q;
 
     let challenges = generate_challenges(&proof, transcript);
 
     for ((L, R), challenge) in Ls.iter().zip(Rs.iter()).zip(challenges.iter()) {
         let challenge_sq = challenge * challenge;
-        C = challenge_sq * L + challenge * C + R;
+        P = challenge_sq * L + challenge * P + R;
     }
 
     for challenge in challenges.iter() {
@@ -153,10 +165,14 @@ pub fn verify(
         H = vector_vector_add(&mut vector_scalar_mul(H_L, challenge), H_R);
     }
 
-    let exp_C = G[0] * proof.a + H[0] * proof.b + (proof.a * proof.b) * Q;
+    let exp_P = G[0] * proof.a + H[0] * proof.b + (proof.a * proof.b) * Q;
 
-    if exp_C != C {
-        panic!("proof failed. expected Commitment {:?} got {:?}", exp_C.compress().as_bytes(),C.compress().as_bytes());
+    if exp_P != P {
+        panic!(
+            "proof failed. expected Commitment {:?} got {:?}",
+            exp_P.compress().as_bytes(),
+            P.compress().as_bytes()
+        );
     }
 }
 
@@ -164,7 +180,6 @@ fn generate_challenges(proof: &NoZK, transcript: &mut Transcript) -> Vec<Scalar>
     let mut challenges: Vec<Scalar> = Vec::new();
 
     for (L, R) in proof.L_vec.iter().zip(proof.R_vec.iter()) {
-
         transcript.append_message(b"u_minus_one", L.as_bytes());
         transcript.append_message(b"u_plus_one", R.as_bytes());
 
@@ -192,34 +207,37 @@ mod tests {
     fn test_create_proof() {
         let mut rng = rand::thread_rng();
 
-        let (a, b, t) = helper_dot_product(4);
+        let n = 4;
 
-        let G: Vec<RistrettoPoint> = (0..4).map(|_| RistrettoPoint::random(&mut rng)).collect();
-        let H: Vec<RistrettoPoint> = (0..4).map(|_| RistrettoPoint::random(&mut rng)).collect();
+        let (a, b, t) = helper_dot_product(n);
+
+        let G: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
+        let H: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
 
         let mut transcript = Transcript::new(b"ip_no_zk");
 
-        let mut Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test");
-        let mut C = RistrettoPoint::vartime_multiscalar_mul(
+        let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
+        let P = RistrettoPoint::vartime_multiscalar_mul(
             a.iter().chain(b.iter()).chain(iter::once(&t)),
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
-        let proof = create(&mut transcript, &Q, C, G.clone(), H.clone(), a, b);
+
+        let proof = create(&mut transcript, &Q, P, G.clone(), H.clone(), a, b);
 
         transcript = Transcript::new(b"ip_no_zk");
 
-        verify(&mut transcript, proof, C, &Q, t, &G, &H);
+        verify(&mut transcript, n, proof, P, &Q, t, &G, &H);
     }
-}
 
-fn helper_dot_product(n: usize) -> (Vec<Scalar>, Vec<Scalar>, Scalar) {
-    let mut rng = rand::thread_rng();
+    fn helper_dot_product(n: usize) -> (Vec<Scalar>, Vec<Scalar>, Scalar) {
+        let mut rng = rand::thread_rng();
 
-    let a: Vec<Scalar> = (0..4).map(|_| Scalar::random(&mut rng)).collect();
-    let b: Vec<Scalar> = (0..4).map(|_| Scalar::random(&mut rng)).collect();
+        let a: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let b: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
 
-    let t: Scalar = inner_product(&a, &b);
-    (a, b, t)
+        let t: Scalar = inner_product(&a, &b);
+        (a, b, t)
+    }
 }
 
 fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {

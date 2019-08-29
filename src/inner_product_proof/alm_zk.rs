@@ -31,8 +31,8 @@ struct AlmZK {
 
 fn create(
     transcript: &mut Transcript,
-    mut G_Vec: Vec<RistrettoPoint>,
-    mut H_Vec: Vec<RistrettoPoint>,
+    G_Vec: Vec<RistrettoPoint>,
+    H_Vec: Vec<RistrettoPoint>,
     Q: &RistrettoPoint,
     C_w: RistrettoPoint,
     a_Vec: Vec<Scalar>,

@@ -8,6 +8,11 @@ use curve25519_dalek::{
 use merlin::Transcript;
 use std::iter;
 
+use crate::math_utils::inner_product;
+
+// TODO: Develop multiexponentiation formula, if any clean version is possible
+// TODO: give each module(no_zk, qesa_inner, ipa_alm_zk, etc) a local crs struct that they can use and pass down to other modules
+
 /// NoZK is an optimisation over the bulletproofs IPA.
 pub struct NoZK {
     // From the literature this would be u_{-1}
@@ -28,7 +33,6 @@ pub fn create(
     mut G_Vec: Vec<RistrettoPoint>,
     mut H_Vec: Vec<RistrettoPoint>,
     Q: &RistrettoPoint,
-    P: RistrettoPoint,
     mut a_vec: Vec<Scalar>,
     mut b_vec: Vec<Scalar>,
 ) -> NoZK {
@@ -53,10 +57,6 @@ pub fn create(
     let lg_n = n.next_power_of_two().trailing_zeros() as usize;
     let mut L_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
     let mut R_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
-
-    // We add the compressed point to the transcript, because we need some non-trivial input to generate alpha
-    // If this is not done, then the prover always will be able to predict what the first challenge will be
-    transcript.append_message(b"p", P.compress().as_bytes());
 
     let alpha = transcript.challenge_scalar(b"alpha");
     let Q = alpha.invert() * Q;
@@ -91,7 +91,6 @@ pub fn create(
         transcript.append_message(b"u_plus_one", R.as_bytes());
 
         let x_i: Scalar = transcript.challenge_scalar(b"x_i");
-
         for i in 0..n {
             a_L[i] = a_L[i] * x_i + a_R[i];
             b_L[i] = b_L[i] + x_i * b_R[i];
@@ -112,67 +111,53 @@ pub fn create(
         b: b[0],
     }
 }
+impl NoZK {
+    pub fn verify(
+        &self,
+        transcript: &mut Transcript,
+        G_Vec: &[RistrettoPoint],
+        H_Vec: &[RistrettoPoint],
+        Q: &RistrettoPoint,
+        n: usize,
+        P: RistrettoPoint,
+        t: Scalar,
+    ) -> bool {
+        let mut G = G_Vec.to_owned();
+        let mut H = H_Vec.to_owned();
 
-pub fn verify(
-    transcript: &mut Transcript,
-    G_Vec: &[RistrettoPoint],
-    H_Vec: &[RistrettoPoint],
-    Q: &RistrettoPoint,
-    n: usize,
-    proof: NoZK,
-    P: RistrettoPoint,
-    t: Scalar,
-) {
-    let mut G = G_Vec.to_owned();
-    let mut H = H_Vec.to_owned();
+        let Ls: Vec<RistrettoPoint> = self.L_vec.iter().map(|L| L.decompress().unwrap()).collect();
+        let Rs: Vec<RistrettoPoint> = self.R_vec.iter().map(|R| R.decompress().unwrap()).collect();
+        assert_eq!(n, 1 << Ls.len());
 
-    let Ls: Vec<RistrettoPoint> = proof
-        .L_vec
-        .iter()
-        .map(|L| L.decompress().unwrap())
-        .collect();
-    let Rs: Vec<RistrettoPoint> = proof
-        .R_vec
-        .iter()
-        .map(|R| R.decompress().unwrap())
-        .collect();
-    assert_eq!(n, 1 << Ls.len());
+        let mut n = 1 << Ls.len();
 
-    let mut n = 1 << Ls.len();
+        transcript.append_u64(b"n", n as u64);
 
-    transcript.append_u64(b"n", n as u64);
-    transcript.append_message(b"p", P.compress().as_bytes());
+        let alpha = transcript.challenge_scalar(b"alpha");
+        let Q = alpha.invert() * Q;
 
-    let alpha = transcript.challenge_scalar(b"alpha");
-    let Q = alpha.invert() * Q;
+        let mut P = P - (alpha - Scalar::one()) * t * Q;
 
-    let mut P = P - (alpha - Scalar::one()) * t * Q;
+        let challenges = generate_challenges(self, transcript);
 
-    let challenges = generate_challenges(&proof, transcript);
+        for ((L, R), challenge) in Ls.iter().zip(Rs.iter()).zip(challenges.iter()) {
+            let challenge_sq = challenge * challenge;
+            P = challenge_sq * L + challenge * P + R;
+        }
 
-    for ((L, R), challenge) in Ls.iter().zip(Rs.iter()).zip(challenges.iter()) {
-        let challenge_sq = challenge * challenge;
-        P = challenge_sq * L + challenge * P + R;
-    }
+        for challenge in challenges.iter() {
+            n = n / 2;
 
-    for challenge in challenges.iter() {
-        n = n / 2;
+            let (G_L, G_R) = G.split_at_mut(n);
+            let (H_L, H_R) = H.split_at_mut(n);
 
-        let (G_L, G_R) = G.split_at_mut(n);
-        let (H_L, H_R) = H.split_at_mut(n);
+            G = vector_vector_add(G_L, &mut vector_scalar_mul(G_R, challenge));
+            H = vector_vector_add(&mut vector_scalar_mul(H_L, challenge), H_R);
+        }
 
-        G = vector_vector_add(G_L, &mut vector_scalar_mul(G_R, challenge));
-        H = vector_vector_add(&mut vector_scalar_mul(H_L, challenge), H_R);
-    }
+        let exp_P = G[0] * self.a + H[0] * self.b + (self.a * self.b) * Q;
 
-    let exp_P = G[0] * proof.a + H[0] * proof.b + (proof.a * proof.b) * Q;
-
-    if exp_P != P {
-        panic!(
-            "proof failed. expected Commitment {:?} got {:?}",
-            exp_P.compress().as_bytes(),
-            P.compress().as_bytes()
-        );
+        exp_P == P
     }
 }
 
@@ -193,7 +178,6 @@ fn generate_challenges(proof: &NoZK, transcript: &mut Transcript) -> Vec<Scalar>
 fn vector_scalar_mul(vec_p: &mut [RistrettoPoint], challenge: &Scalar) -> Vec<RistrettoPoint> {
     vec_p.iter().map(|p| p * challenge).collect()
 }
-
 fn vector_vector_add(a: &mut [RistrettoPoint], b: &mut [RistrettoPoint]) -> Vec<RistrettoPoint> {
     a.iter().zip(b.iter()).map(|(a, b)| a + b).collect()
 }
@@ -201,10 +185,11 @@ fn vector_vector_add(a: &mut [RistrettoPoint], b: &mut [RistrettoPoint]) -> Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math_utils::*;
     use sha3::Sha3_512;
     use std::iter;
     #[test]
-    fn test_create_proof() {
+    fn test_create_nozk_proof() {
         let mut rng = rand::thread_rng();
 
         let n = 4;
@@ -213,33 +198,24 @@ mod tests {
 
         let G: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
         let H: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
+        let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
         let mut transcript = Transcript::new(b"ip_no_zk");
 
-        let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
         let P = RistrettoPoint::vartime_multiscalar_mul(
             a.iter().chain(b.iter()).chain(iter::once(&t)),
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
-        let proof = create(&mut transcript, G.clone(), H.clone(), &Q, P, a, b);
+        // We add the compressed point to the transcript, because we need some non-trivial input to generate alpha
+        // If this is not done, then the prover always will be able to predict what the first challenge will be
+        transcript.append_message(b"P", P.compress().as_bytes());
+
+        let proof = create(&mut transcript, G.clone(), H.clone(), &Q, a, b);
 
         transcript = Transcript::new(b"ip_no_zk");
+        transcript.append_message(b"P", P.compress().as_bytes());
 
-        verify(&mut transcript, &G, &H, &Q, n, proof, P, t);
+        assert!(proof.verify(&mut transcript, &G, &H, &Q, n, P, t));
     }
-
-    fn helper_dot_product(n: usize) -> (Vec<Scalar>, Vec<Scalar>, Scalar) {
-        let mut rng = rand::thread_rng();
-
-        let a: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let b: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-
-        let t: Scalar = inner_product(&a, &b);
-        (a, b, t)
-    }
-}
-
-fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
-    a.iter().zip(b.iter()).map(|(a, b)| a * b).sum()
 }

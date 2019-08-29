@@ -11,7 +11,6 @@ fn sample_m_n_plus(n: usize) -> Vec<Scalar> {
 
     let mut i = 4;
     while i <= n {
-        
         r[i / 2] = Scalar::random(&mut rng);
         r[i / 2 + 1] = Scalar::random(&mut rng);
 

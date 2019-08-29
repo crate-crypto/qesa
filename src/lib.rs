@@ -1,4 +1,5 @@
-pub mod inner_product_proof;
+mod inner_product_proof;
+mod math_utils;
 mod transcript;
 
 #[cfg(test)]

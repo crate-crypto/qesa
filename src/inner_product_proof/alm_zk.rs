@@ -51,7 +51,6 @@ fn create(
     transcript.append_message(b"C_r", C_r.compress().as_bytes());
 
     let beta = transcript.challenge_scalar(b"beta");
-    println!("prove beta {:x?}", beta.as_bytes());
 
     let a_prime_Vec: Vec<Scalar> = a_Vec
         .iter()
@@ -65,16 +64,7 @@ fn create(
         .map(|(b, r)| beta * b + r)
         .collect();
 
-    let beta_sq_t = crate::math_utils::inner_product(&a_prime_Vec, &b_prime_Vec);
-
-    let P = RistrettoPoint::vartime_multiscalar_mul(
-        a_prime_Vec
-            .iter()
-            .chain(b_prime_Vec.iter())
-            .chain(iter::once(&beta_sq_t)),
-        G_Vec.iter().chain(H_Vec.iter()).chain(iter::once(Q)),
-    )
-    .compress();
+    let P = ((beta * C_w) + C_r + (beta * beta * t * Q)).compress();
 
     transcript.append_message(b"P", P.as_bytes());
 

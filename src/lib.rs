@@ -1,5 +1,7 @@
+mod inner;
 mod inner_product_proof;
 mod math_utils;
+mod matrix;
 mod transcript;
 
 #[cfg(test)]

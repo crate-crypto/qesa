@@ -1,7 +1,7 @@
 use crate::math_utils::inner_product;
 use curve25519_dalek::scalar::Scalar;
 
-// we will use dense matrix operations until sparse matrix functionality
+// N.B we will use these dense matrix operations until sparse matrix functionality
 // is implemented.
 
 // multiplies every element in the matrix by the scalar

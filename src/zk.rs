@@ -1,10 +1,8 @@
 use crate::inner;
 use crate::matrix::*;
-use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
-    ristretto::{CompressedRistretto, RistrettoPoint},
+    ristretto::RistrettoPoint,
     scalar::Scalar,
-    traits::VartimeMultiscalarMul,
 };
 use merlin::Transcript;
 
@@ -30,7 +28,7 @@ impl Zk {
     pub fn verify(
         &self,
         transcript: &mut Transcript,
-        mut G_Vec: Vec<RistrettoPoint>,
+        G_Vec: Vec<RistrettoPoint>,
         H_Vec: Vec<RistrettoPoint>,
         Q: &RistrettoPoint,
         gamma_i: &block_matrix,

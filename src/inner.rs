@@ -20,6 +20,7 @@ Notes: This is a sub-section of qesa_zk.
 
 struct Inner {
     alm_zk: alm_zk::AlmZK,
+    c_prime_w : CompressedRistretto,
     c_prime_prime_w: CompressedRistretto,
 }
 
@@ -32,7 +33,6 @@ fn create(
     gamma_i: &block_matrix,
     w: Vec<Scalar>,
     r_prime: Vec<Scalar>,
-    mut c_prime_w: RistrettoPoint,
 ) -> Inner {
     let n = G_Vec.len();
 
@@ -42,8 +42,7 @@ fn create(
     let w_prime = [&w[..], &r_prime[..]].concat();
     assert_eq!(w_prime.len(), n);
 
-    c_prime_w = RistrettoPoint::vartime_multiscalar_mul(w_prime.iter(), G_Vec.iter());
-
+    let c_prime_w = RistrettoPoint::vartime_multiscalar_mul(w_prime.iter(), G_Vec.iter());
     transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
 
     let x_challenges: Vec<Scalar> = vandemonde_challenge(transcript.challenge_scalar(b"x"), n);
@@ -55,9 +54,6 @@ fn create(
 
     // Change the first generator in g'
     G_Vec[0] = G_Vec[0] * beta.invert();
-
-    c_prime_w = c_prime_w - (beta - Scalar::one()) * G_Vec[0];
-    transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
 
     // r_prime_prime is a rotation of r_prime by 90 degrees
     let r_prime_prime = vec![-r_prime[1], r_prime[0]];
@@ -95,6 +91,7 @@ fn create(
 
     Inner {
         alm_zk: proof,
+        c_prime_w : c_prime_w.compress(),
         c_prime_prime_w: c_prime_prime_w.compress(),
     }
 }
@@ -107,13 +104,13 @@ impl Inner {
         H_Vec: Vec<RistrettoPoint>,
         Q: &RistrettoPoint,
         gamma_i: &block_matrix,
-        mut c_prime_w: RistrettoPoint,
     ) -> bool {
         let n = H_Vec.len();
 
-        let c_prime_prime_w = self.c_prime_prime_w.decompress().unwrap();
-
+        let c_prime_w = self.c_prime_w.decompress().unwrap();
         transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
+
+        let c_prime_prime_w = self.c_prime_prime_w.decompress().unwrap();
 
         let x_challenges: Vec<Scalar> = vandemonde_challenge(transcript.challenge_scalar(b"x"), n);
         assert_eq!(x_challenges.len(), n);
@@ -125,8 +122,7 @@ impl Inner {
         // Change the first generator in g'
         G_Vec[0] = G_Vec[0] * beta.invert();
 
-        c_prime_w = c_prime_w - (beta - Scalar::one()) * G_Vec[0];
-        transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
+        let c_prime_w = c_prime_w - (beta - Scalar::one()) * G_Vec[0];
 
         transcript.append_message(b"c_prime_prime_w", c_prime_prime_w.compress().as_bytes());
 
@@ -168,7 +164,7 @@ fn vandemonde_challenge(x: Scalar, n: usize) -> Vec<Scalar> {
 
     challenges.push(x_n);
 
-    for i in 1..n {
+    for _ in 1..n {
         x_n = x_n * x_n;
         challenges.push(x_n)
     }
@@ -219,15 +215,11 @@ mod tests {
 
         let G: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
         let H: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
-
-        let mut transcript = Transcript::new(b"qesa_inner");
-
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
         let r_prime: Vec<Scalar> = (0..2).map(|_| Scalar::random(&mut rng)).collect();
 
-        let w_prime = [&witness[..], &r_prime[..]].concat();
-        let c_prime_w = RistrettoPoint::vartime_multiscalar_mul(w_prime.iter(), G.iter());
+        let mut transcript = Transcript::new(b"qesa_inner");
 
         let proof = create(
             &mut transcript,
@@ -237,13 +229,13 @@ mod tests {
             &matrix,
             witness,
             r_prime,
-            c_prime_w.clone(),
         );
 
         let mut transcript = Transcript::new(b"qesa_inner");
+
         assert_eq!(
             true,
-            proof.verify(&mut transcript, G, H, &Q, &matrix, c_prime_w.clone())
+            proof.verify(&mut transcript, G, H, &Q, &matrix)
         )
     }
     // Creates a system of quadratic equations with solutions
@@ -255,7 +247,7 @@ mod tests {
 
         let mut bm = block_matrix::new();
 
-        for i in 0..num_of_matrices {
+        for _ in 0..num_of_matrices {
             let mut gamma_i: Vec<Vec<Scalar>> = Vec::new();
             for _ in 0..n {
                 // Use gram schmidt to create suitable solutions for each system of eqns

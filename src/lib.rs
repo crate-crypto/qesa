@@ -3,6 +3,7 @@ mod inner_product_proof;
 mod math_utils;
 mod matrix;
 mod transcript;
+pub mod zk;
 
 #[cfg(test)]
 mod tests {

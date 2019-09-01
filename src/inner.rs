@@ -17,10 +17,9 @@ Notes: This is a sub-section of qesa_zk.
 */
 // XXX: We need to formalise the way data is added to the transcript
 // XXX: The code currently does not make use of the efficiency of sparse matrices
-
 pub struct Inner {
     alm_zk: alm_zk::AlmZK,
-    c_prime_w : CompressedRistretto,
+    c_prime_w: CompressedRistretto,
     c_prime_prime_w: CompressedRistretto,
 }
 
@@ -85,12 +84,12 @@ pub fn create(
         a.iter().chain(b.iter()),
         G_Vec.iter().chain(H_Vec.iter()),
     );
-    
+
     let proof = alm_zk::create(transcript, G_Vec, H_Vec, Q, C_w, a, b, t);
 
     Inner {
         alm_zk: proof,
-        c_prime_w : c_prime_w.compress(),
+        c_prime_w: c_prime_w.compress(),
         c_prime_prime_w: c_prime_prime_w.compress(),
     }
 }
@@ -232,10 +231,7 @@ mod tests {
 
         let mut transcript = Transcript::new(b"qesa_inner");
 
-        assert_eq!(
-            true,
-            proof.verify(&mut transcript, G, H, &Q, &matrix)
-        )
+        assert!(proof.verify(&mut transcript, G, H, &Q, &matrix))
     }
     // Creates a system of quadratic equations with solutions
     // and a witness

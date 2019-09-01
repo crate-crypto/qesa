@@ -1,9 +1,6 @@
 use crate::inner;
 use crate::matrix::*;
-use curve25519_dalek::{
-    ristretto::RistrettoPoint,
-    scalar::Scalar,
-};
+use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;
 
 pub struct Zk {
@@ -33,6 +30,6 @@ impl Zk {
         Q: &RistrettoPoint,
         gamma_i: &block_matrix,
     ) -> bool {
-        self.inner.verify(transcript,G_Vec, H_Vec, Q, gamma_i)
+        self.inner.verify(transcript, G_Vec, H_Vec, Q, gamma_i)
     }
 }

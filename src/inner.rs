@@ -62,21 +62,7 @@ fn create(
     // r_prime_prime is a rotation of r_prime by 90 degrees
     let r_prime_prime = vec![-r_prime[1], r_prime[0]];
 
-    // -- DEBUG r_prime_prime
-    let mut R: Vec<Vec<Scalar>> = Vec::new();
-    R.push(vec![Scalar::zero(), -Scalar::one()]);
-    R.push(vec![Scalar::one(), Scalar::zero()]);
-
-    let expected_r_prime_prime = matrix_vector_mul(&R, &r_prime);
-    assert_eq!(expected_r_prime_prime, r_prime_prime);
-    // -- End DEBUG r_prime_prime
-
     let gamma_w = matrix_vector_mul(&gamma, &w);
-
-    // DEBUG - gamma_w
-    let should_be_zero = crate::math_utils::inner_product(&w, &gamma_w);
-    assert_eq!(Scalar::zero(), should_be_zero);
-    // End DEBUG - gamma_w
 
     let w_prime_prime = [&gamma_w[..], &r_prime_prime[..]].concat();
 
@@ -99,35 +85,13 @@ fn create(
     let a = row_row_sub(&w_prime, &s_prime);
     let b = row_row_add(&w_prime_prime, &gamma_prime_t_s_prime);
     let t = crate::math_utils::inner_product(&a, &b);
-    println!("prover t {:?}", t.as_bytes());
 
-    // DEBUG - Check correct t is calculated
-    let gamma_t = matrix_transpose(&gamma);
-    let gamma_t_s = matrix_vector_mul(&gamma_t, &s_challenges);
-
-    let expected_t = -crate::math_utils::inner_product(&s_challenges, &gamma_t_s);
-    assert_eq!(t, expected_t);
-    // END Debug
-
-    // DEBUG - C_w
-    let expected_C_w = RistrettoPoint::vartime_multiscalar_mul(
+    let C_w = RistrettoPoint::vartime_multiscalar_mul(
         a.iter().chain(b.iter()),
         G_Vec.iter().chain(H_Vec.iter()),
     );
-
-    let expected_C_w_a =
-        c_prime_w - RistrettoPoint::vartime_multiscalar_mul(s_prime.iter(), G_Vec.iter());
-    let C_w_a = RistrettoPoint::vartime_multiscalar_mul(a.iter(), G_Vec.iter());
-    assert_eq!(C_w_a, expected_C_w_a);
-
-    let expected_C_w_b = c_prime_prime_w
-        + RistrettoPoint::vartime_multiscalar_mul(gamma_prime_t_s_prime.iter(), H_Vec.iter());
-    let C_w_b = RistrettoPoint::vartime_multiscalar_mul(b.iter(), H_Vec.iter());
-    assert_eq!(C_w_b, expected_C_w_b);
-
-    // END debug
-
-    let proof = alm_zk::create(transcript, G_Vec, H_Vec, Q, expected_C_w, a, b, t);
+    
+    let proof = alm_zk::create(transcript, G_Vec, H_Vec, Q, C_w, a, b, t);
 
     Inner {
         alm_zk: proof,
@@ -163,13 +127,8 @@ impl Inner {
 
         c_prime_w = c_prime_w - (beta - Scalar::one()) * G_Vec[0];
         transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
-        println!(" verify c prime w {:?}", c_prime_w.compress().as_bytes());
 
         transcript.append_message(b"c_prime_prime_w", c_prime_prime_w.compress().as_bytes());
-        println!(
-            " verify c prime prime w {:?}",
-            c_prime_prime_w.compress().as_bytes()
-        );
 
         let s_challenges = vandemonde_challenge(transcript.challenge_scalar(b"s"), n - 2);
         let b_challenges = vandemonde_challenge(transcript.challenge_scalar(b"b"), 2);
@@ -186,7 +145,6 @@ impl Inner {
         let gamma_t_s = matrix_vector_mul(&gamma_t, &s_challenges);
 
         let t = -crate::math_utils::inner_product(&s_challenges, &gamma_t_s);
-        println!("verifier t {:?}", t.as_bytes());
 
         let mut C_w = c_prime_w + c_prime_prime_w
             - RistrettoPoint::vartime_multiscalar_mul(s_prime.iter(), G_Vec.iter());
@@ -200,7 +158,6 @@ impl Inner {
 
 // Creates a vector from the scalar `x`
 // contents of vector = <x, x^2, x^3,.., x^n>
-
 // XXX: double check that it is fine to use a vandermonde matrix to
 // expand challenges instead of fetching each challenge from the distribution
 // so we don't need `n` different challenges

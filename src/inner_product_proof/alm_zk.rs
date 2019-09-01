@@ -10,7 +10,6 @@ use crate::inner_product_proof::gramschmidt::*;
 use crate::inner_product_proof::no_zk;
 use crate::transcript::TranscriptProtocol;
 use merlin::Transcript;
-use std::iter;
 
 /*
 Notes:
@@ -24,12 +23,12 @@ This allows us to mask the witness without introducing errors into the protcol.
 Similar to bulletproof, we will send these masked values into the IPA_NO_ZK which is just a prove of knowledge.
 */
 
-struct AlmZK {
+pub struct AlmZK {
     C_r: CompressedRistretto,
     NoZK: no_zk::NoZK,
 }
 
-fn create(
+pub fn create(
     transcript: &mut Transcript,
     G_Vec: Vec<RistrettoPoint>,
     H_Vec: Vec<RistrettoPoint>,
@@ -49,7 +48,6 @@ fn create(
     );
 
     transcript.append_message(b"C_r", C_r.compress().as_bytes());
-
     let beta = transcript.challenge_scalar(b"beta");
 
     let a_prime_Vec: Vec<Scalar> = a_Vec
@@ -77,7 +75,7 @@ fn create(
 }
 
 impl AlmZK {
-    fn verify(
+    pub fn verify(
         &self,
         transcript: &mut Transcript,
         G_Vec: &[RistrettoPoint],
@@ -95,7 +93,6 @@ impl AlmZK {
         let beta_sq_t = beta * beta * t;
 
         let P = (beta * C_w) + C_r + (beta_sq_t * Q);
-
         transcript.append_message(b"P", P.compress().as_bytes());
 
         self.NoZK

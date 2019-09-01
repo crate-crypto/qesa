@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+use crate::inner_product_proof::alm_zk;
 use crate::matrix::*;
 use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
@@ -7,6 +8,7 @@ use curve25519_dalek::{
     traits::VartimeMultiscalarMul,
 };
 use merlin::Transcript;
+use std::iter;
 /*
 
 Notes: This is a sub-section of qesa_zk.
@@ -17,8 +19,8 @@ Notes: This is a sub-section of qesa_zk.
 // XXX: The code currently does not make use of the efficiency of sparse matrices
 
 struct Inner {
-    // Set of equations we want the solution for
-//    matrice : Vec<Scalar>
+    alm_zk: alm_zk::AlmZK,
+    c_prime_prime_w: CompressedRistretto,
 }
 
 #[allow(dead_code)]
@@ -27,10 +29,11 @@ fn create(
     mut G_Vec: Vec<RistrettoPoint>,
     H_Vec: Vec<RistrettoPoint>,
     Q: &RistrettoPoint,
-    gamma_i: block_matrix, // set of system of quadratic equations
+    gamma_i: &block_matrix,
     w: Vec<Scalar>,
     r_prime: Vec<Scalar>,
-) {
+    mut c_prime_w: RistrettoPoint,
+) -> Inner {
     let n = G_Vec.len();
 
     assert_eq!(w.len(), n - 2);
@@ -39,7 +42,8 @@ fn create(
     let w_prime = [&w[..], &r_prime[..]].concat();
     assert_eq!(w_prime.len(), n);
 
-    let mut c_prime_w = RistrettoPoint::vartime_multiscalar_mul(w_prime.iter(), G_Vec.iter());
+    c_prime_w = RistrettoPoint::vartime_multiscalar_mul(w_prime.iter(), G_Vec.iter());
+
     transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
 
     let x_challenges: Vec<Scalar> = vandemonde_challenge(transcript.challenge_scalar(b"x"), n);
@@ -47,7 +51,7 @@ fn create(
 
     let gamma = gamma_i.block_matrix_batch(&x_challenges);
 
-    let beta = x_challenges[0];
+    let beta = x_challenges[1];
 
     // Change the first generator in g'
     G_Vec[0] = G_Vec[0] * beta.invert();
@@ -70,10 +74,8 @@ fn create(
     let gamma_w = matrix_vector_mul(&gamma, &w);
 
     // DEBUG - gamma_w
-
     let should_be_zero = crate::math_utils::inner_product(&w, &gamma_w);
     assert_eq!(Scalar::zero(), should_be_zero);
-
     // End DEBUG - gamma_w
 
     let w_prime_prime = [&gamma_w[..], &r_prime_prime[..]].concat();
@@ -96,14 +98,104 @@ fn create(
 
     let a = row_row_sub(&w_prime, &s_prime);
     let b = row_row_add(&w_prime_prime, &gamma_prime_t_s_prime);
+    let t = crate::math_utils::inner_product(&a, &b);
+    println!("prover t {:?}", t.as_bytes());
 
-    let t = -crate::math_utils::inner_product(&a, &b);
-
+    // DEBUG - Check correct t is calculated
     let gamma_t = matrix_transpose(&gamma);
     let gamma_t_s = matrix_vector_mul(&gamma_t, &s_challenges);
 
-    let expected_t = crate::math_utils::inner_product(&s_challenges, &gamma_t_s);
+    let expected_t = -crate::math_utils::inner_product(&s_challenges, &gamma_t_s);
     assert_eq!(t, expected_t);
+    // END Debug
+
+    // DEBUG - C_w
+    let expected_C_w = RistrettoPoint::vartime_multiscalar_mul(
+        a.iter().chain(b.iter()),
+        G_Vec.iter().chain(H_Vec.iter()),
+    );
+
+    let expected_C_w_a =
+        c_prime_w - RistrettoPoint::vartime_multiscalar_mul(s_prime.iter(), G_Vec.iter());
+    let C_w_a = RistrettoPoint::vartime_multiscalar_mul(a.iter(), G_Vec.iter());
+    assert_eq!(C_w_a, expected_C_w_a);
+
+    let expected_C_w_b = c_prime_prime_w
+        + RistrettoPoint::vartime_multiscalar_mul(gamma_prime_t_s_prime.iter(), H_Vec.iter());
+    let C_w_b = RistrettoPoint::vartime_multiscalar_mul(b.iter(), H_Vec.iter());
+    assert_eq!(C_w_b, expected_C_w_b);
+
+    // END debug
+
+    let proof = alm_zk::create(transcript, G_Vec, H_Vec, Q, expected_C_w, a, b, t);
+
+    Inner {
+        alm_zk: proof,
+        c_prime_prime_w: c_prime_prime_w.compress(),
+    }
+}
+
+impl Inner {
+    pub fn verify(
+        &self,
+        transcript: &mut Transcript,
+        mut G_Vec: Vec<RistrettoPoint>,
+        H_Vec: Vec<RistrettoPoint>,
+        Q: &RistrettoPoint,
+        gamma_i: &block_matrix,
+        mut c_prime_w: RistrettoPoint,
+    ) -> bool {
+        let n = H_Vec.len();
+
+        let c_prime_prime_w = self.c_prime_prime_w.decompress().unwrap();
+
+        transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
+
+        let x_challenges: Vec<Scalar> = vandemonde_challenge(transcript.challenge_scalar(b"x"), n);
+        assert_eq!(x_challenges.len(), n);
+
+        let gamma = gamma_i.block_matrix_batch(&x_challenges);
+
+        let beta = x_challenges[1];
+
+        // Change the first generator in g'
+        G_Vec[0] = G_Vec[0] * beta.invert();
+
+        c_prime_w = c_prime_w - (beta - Scalar::one()) * G_Vec[0];
+        transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
+        println!(" verify c prime w {:?}", c_prime_w.compress().as_bytes());
+
+        transcript.append_message(b"c_prime_prime_w", c_prime_prime_w.compress().as_bytes());
+        println!(
+            " verify c prime prime w {:?}",
+            c_prime_prime_w.compress().as_bytes()
+        );
+
+        let s_challenges = vandemonde_challenge(transcript.challenge_scalar(b"s"), n - 2);
+        let b_challenges = vandemonde_challenge(transcript.challenge_scalar(b"b"), 2);
+
+        let s_prime = [&s_challenges[..], &b_challenges[..]].concat();
+        assert_eq!(s_prime.len(), n);
+
+        let gamma_prime = compute_gamma_prime(&gamma, n);
+
+        let gamma_prime_t = matrix_transpose(&gamma_prime);
+        let gamma_prime_t_s_prime = matrix_vector_mul(&gamma_prime_t, &s_prime);
+
+        let gamma_t = matrix_transpose(&gamma);
+        let gamma_t_s = matrix_vector_mul(&gamma_t, &s_challenges);
+
+        let t = -crate::math_utils::inner_product(&s_challenges, &gamma_t_s);
+        println!("verifier t {:?}", t.as_bytes());
+
+        let mut C_w = c_prime_w + c_prime_prime_w
+            - RistrettoPoint::vartime_multiscalar_mul(s_prime.iter(), G_Vec.iter());
+        C_w = C_w
+            + RistrettoPoint::vartime_multiscalar_mul(gamma_prime_t_s_prime.iter(), H_Vec.iter());
+
+        self.alm_zk
+            .verify(transcript, &G_Vec, &H_Vec, &Q, n, C_w, t)
+    }
 }
 
 // Creates a vector from the scalar `x`
@@ -130,10 +222,8 @@ fn vandemonde_challenge(x: Scalar, n: usize) -> Vec<Scalar> {
 }
 
 fn compute_gamma_prime(gamma: &Vec<Vec<Scalar>>, n: usize) -> Vec<Vec<Scalar>> {
-    let mut gamma_prime = gamma.clone();
-
     // Pad the gamma rows with zeroes at the end
-    gamma_prime = gamma_prime
+    let mut gamma_prime: Vec<Vec<Scalar>> = gamma
         .iter()
         .map(|row| {
             let mut padded_row = row.clone();
@@ -146,12 +236,12 @@ fn compute_gamma_prime(gamma: &Vec<Vec<Scalar>>, n: usize) -> Vec<Vec<Scalar>> {
     let mut row_n_minus_two = vec![Scalar::zero(); n - 2];
     row_n_minus_two.push(Scalar::zero());
     row_n_minus_two.push(-Scalar::from(1 as u8));
+    gamma_prime.push(row_n_minus_two);
 
     let mut row_n_minus_one = vec![Scalar::zero(); n - 2];
     row_n_minus_one.push(Scalar::one());
     row_n_minus_one.push(Scalar::zero());
 
-    gamma_prime.push(row_n_minus_two);
     gamma_prime.push(row_n_minus_one);
 
     gamma_prime
@@ -177,15 +267,34 @@ mod tests {
 
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
-        let r_prime = (0..2).map(|_| Scalar::random(&mut rng)).collect();
+        let r_prime: Vec<Scalar> = (0..2).map(|_| Scalar::random(&mut rng)).collect();
 
-        create(&mut transcript, G, H, &Q, matrix, witness, r_prime);
+        let w_prime = [&witness[..], &r_prime[..]].concat();
+        let c_prime_w = RistrettoPoint::vartime_multiscalar_mul(w_prime.iter(), G.iter());
+
+        let proof = create(
+            &mut transcript,
+            G.clone(),
+            H.clone(),
+            &Q,
+            &matrix,
+            witness,
+            r_prime,
+            c_prime_w.clone(),
+        );
+
+        let mut transcript = Transcript::new(b"qesa_inner");
+        assert_eq!(
+            true,
+            proof.verify(&mut transcript, G, H, &Q, &matrix, c_prime_w.clone())
+        )
     }
     // Creates a system of quadratic equations with solutions
     // and a witness
     fn helper_create_solutions(n: usize, num_of_matrices: usize) -> (Vec<Scalar>, block_matrix) {
         let mut rng = rand::thread_rng();
-        let witness: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let mut witness: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        witness[0] = Scalar::one();
 
         let mut bm = block_matrix::new();
 

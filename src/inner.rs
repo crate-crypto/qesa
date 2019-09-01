@@ -8,7 +8,7 @@ use curve25519_dalek::{
     traits::VartimeMultiscalarMul,
 };
 use merlin::Transcript;
-use std::iter;
+
 /*
 
 Notes: This is a sub-section of qesa_zk.
@@ -18,14 +18,13 @@ Notes: This is a sub-section of qesa_zk.
 // XXX: We need to formalise the way data is added to the transcript
 // XXX: The code currently does not make use of the efficiency of sparse matrices
 
-struct Inner {
+pub struct Inner {
     alm_zk: alm_zk::AlmZK,
     c_prime_w : CompressedRistretto,
     c_prime_prime_w: CompressedRistretto,
 }
 
-#[allow(dead_code)]
-fn create(
+pub fn create(
     transcript: &mut Transcript,
     mut G_Vec: Vec<RistrettoPoint>,
     H_Vec: Vec<RistrettoPoint>,

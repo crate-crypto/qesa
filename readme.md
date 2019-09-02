@@ -6,6 +6,9 @@
 
 - Populate Readme file
 
+### Paper
+
+https://eprint.iacr.org/2019/944.pdf
 
 ### LICENSE
 

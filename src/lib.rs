@@ -1,3 +1,4 @@
+mod copy;
 mod inner;
 mod inner_product_proof;
 mod math_utils;

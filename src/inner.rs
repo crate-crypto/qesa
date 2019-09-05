@@ -17,6 +17,7 @@ Notes: This is a sub-section of qesa_zk.
 */
 // XXX: We need to formalise the way data is added to the transcript
 // XXX: The code currently does not make use of the efficiency of sparse matrices
+// XXX: Maybe this should be moved to Inner_product_proof as it is essentially making sure <w, gamma * w> =0
 pub struct Inner {
     alm_zk: alm_zk::AlmZK,
     c_prime_w: CompressedRistretto,

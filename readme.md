@@ -5,6 +5,7 @@
 ### TODO
 
 - Populate Readme file
+- remove all #[allow(dead_code)]
 
 ### Paper
 

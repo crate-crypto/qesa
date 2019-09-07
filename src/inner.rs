@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::inner_product_proof::alm_zk;
+use crate::inner_product_argument::alm_zk;
 use crate::math_utils::vandemonde_challenge;
 use crate::matrix::*;
 use crate::transcript::TranscriptProtocol;
@@ -17,7 +17,7 @@ Notes: This is a sub-section of qesa_zk.
 */
 // XXX: We need to formalise the way data is added to the transcript
 // XXX: The code currently does not make use of the efficiency of sparse matrices
-// XXX: Maybe this should be moved to Inner_product_proof as it is essentially making sure <w, gamma * w> =0
+// XXX: Maybe this should be moved to inner_product_argument as it is essentially making sure <w, gamma * w> =0
 #[derive(Clone)]
 pub struct Inner {
     pub(crate) alm_zk: alm_zk::AlmZK,
@@ -226,7 +226,7 @@ mod tests {
             for _ in 0..n {
                 // Use gram schmidt to create suitable solutions for each system of eqns
                 let x: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-                let row_of_eqns = crate::inner_product_proof::gramschmidt::orth(&witness, &x);
+                let row_of_eqns = crate::inner_product_argument::gramschmidt::orth(&witness, &x);
                 gamma_i.push(row_of_eqns)
             }
             bm.push(gamma_i);

@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::inner_product_proof::{gramschmidt::*, no_zk};
+use crate::inner_product_argument::{gramschmidt::*, no_zk};
 use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
     ristretto::{CompressedRistretto, RistrettoPoint},

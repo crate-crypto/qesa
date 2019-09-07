@@ -51,7 +51,12 @@ pub fn create(
     // in the witness
     //
     // Collect all messages
-    let all_messages :Vec<Scalar>= commitments.iter().map(|(msgs, _)|msgs).flatten().cloned().collect();
+    let all_messages: Vec<Scalar> = commitments
+        .iter()
+        .map(|(msgs, _)| msgs)
+        .flatten()
+        .cloned()
+        .collect();
     for (msg, msg_map) in all_messages.iter().zip(map.msgs_map.iter()) {
         w_prime[msg_map.position as usize] = *msg;
     }
@@ -76,21 +81,20 @@ pub fn create(
         .zip(alpha_challenges.iter())
         .map(|(rnd, alpha)| rnd * alpha)
         .sum();
-    w_prime[n-1] += aggregated_rand; 
+    w_prime[n - 1] += aggregated_rand;
 
     // Compute aggregated witness values
     // XXX: This needs cleaning up and more commenting, so that readers know what is happening
     for msg_map in map.msgs_map.iter() {
-
-        // For each message. We need to figure out what position 
-        // it is in, in terms of it's original commitment 
+        // For each message. We need to figure out what position
+        // it is in, in terms of it's original commitment
         // This is the same as the key_id or generator indice (see paper - orange values)
         let key_id_position = msg_map.key_id;
         // This position is it's usable position in the witness vector. (see paper - green values)
         let msg_position = msg_map.position;
         // For each row of messages, the challenge value is the same
         // In order to determine what challenge is needed
-        // We can fetch the crs_id 
+        // We can fetch the crs_id
         let crs_id = msg_map.crs_id;
 
         let w_msg_pos = w_prime[msg_position as usize];
@@ -135,7 +139,7 @@ pub fn create(
     // Note that w_prime and r_prime are different than the original w and r_prime
     let r_prime = w_prime.split_off(n - 2);
     assert_eq!(r_prime.len(), 2);
-    assert_eq!(w_prime.len(), n-2);
+    assert_eq!(w_prime.len(), n - 2);
     //5. Run Qesa_inner as a sub protocol
     //
     let proof = inner::create(transcript, G_Vec, H_Vec, Q, &gamma_i, w_prime, r_prime);
@@ -317,25 +321,25 @@ mod tests {
         let bm = block_matrix::new();
 
         // Generate the `message` and random scalar for the commitment
-        let message : Vec<Scalar>= vec![Scalar::from(1 as u8),Scalar::from(1 as u8)];
+        let message: Vec<Scalar> = vec![Scalar::from(1 as u8), Scalar::from(1 as u8)];
         let rand = Scalar::from(1 as u8);
 
         // Generate indices for messages
-        let mut set_of_indice : Vec<BTreeSet<u16>> = Vec::new();                
+        let mut set_of_indice: Vec<BTreeSet<u16>> = Vec::new();
         let mut b: BTreeSet<u16> = BTreeSet::new();
-                for i in 0..message.len() {
-                    b.insert((i + 1) as u16);
-                }
+        for i in 0..message.len() {
+            b.insert((i + 1) as u16);
+        }
         set_of_indice.push(b);
 
         // Generate actual commitments
         let commitment = mapping::commit(&G, &set_of_indice[0], &message, &rand);
         let commitments: Vec<RistrettoPoint> = vec![commitment];
-        
+
         let map = mapping::compute_mapping(&G, witness.len(), &set_of_indice);
         let mut transcript = Transcript::new(b"copy");
 
-        let openings : Vec<(Vec<Scalar>, Scalar)>= vec![(message,rand)]; 
+        let openings: Vec<(Vec<Scalar>, Scalar)> = vec![(message, rand)];
 
         let proof = create(
             &mut transcript,

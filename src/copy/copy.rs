@@ -20,7 +20,7 @@ pub struct Copy {
     C_w: CompressedRistretto,
     inner: qesa_inner::Inner,
 }
-#[allow(dead_code)]
+
 pub fn create(
     transcript: &mut Transcript,
     G_Vec: Vec<RistrettoPoint>,
@@ -164,6 +164,7 @@ pub fn create(
         inner: proof,
     }
 }
+
 impl Copy {
     fn verify(
         &self,

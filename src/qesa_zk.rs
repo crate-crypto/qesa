@@ -4,7 +4,7 @@ use crate::matrix::*;
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;
 
-// QESA_ZK is a glorified wrpapper around Qesa_Inner
+// QESA_ZK is a glorified wrapper around Qesa_Inner
 pub struct Zk {
     inner: qesa_inner::Inner,
 }

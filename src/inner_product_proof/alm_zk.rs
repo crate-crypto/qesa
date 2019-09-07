@@ -1,27 +1,13 @@
 #![allow(non_snake_case)]
-
+use crate::inner_product_proof::{gramschmidt::*, no_zk};
+use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
     ristretto::{CompressedRistretto, RistrettoPoint},
     scalar::Scalar,
     traits::VartimeMultiscalarMul,
 };
-
-use crate::inner_product_proof::gramschmidt::*;
-use crate::inner_product_proof::no_zk;
-use crate::transcript::TranscriptProtocol;
 use merlin::Transcript;
 
-/*
-Notes:
-we take a vector from the kernel of witness_prime_prime; r_prime.
-Therefore we do not introduce errors as <r_prime, witness_prime_prime> from def of kernel
-AND
-We then take the next random value r_prime_prime from the kernel of witness_prime intersect r_prime.
-Therefore <r_prime_prime, w_prime> = 0 = <r_prime, r_prime_prime>
-
-This allows us to mask the witness without introducing errors into the protcol.
-Similar to bulletproof, we will send these masked values into the IPA_NO_ZK which is just a prove of knowledge.
-*/
 #[derive(Clone)]
 pub struct AlmZK {
     C_r: CompressedRistretto,
@@ -38,36 +24,52 @@ pub fn create(
     b_Vec: Vec<Scalar>,
     t: Scalar,
 ) -> AlmZK {
+    //1. Compute r' and r''
+    //
     let r_prime = sample_gram_schmidt(&b_Vec);
 
     let r_prime_prime = sample_gram_schmidt_twice(&a_Vec, &r_prime);
 
+    //2. Compute Commitment (C_r) to r' and r''
+    //
     let C_r = RistrettoPoint::vartime_multiscalar_mul(
         r_prime.iter().chain(r_prime_prime.iter()),
         G_Vec.iter().chain(H_Vec.iter()),
     );
-
     transcript.append_message(b"C_r", C_r.compress().as_bytes());
+
+    //3. Compute challenge based on C_r
+    //
     let beta = transcript.challenge_scalar(b"beta");
 
-    let a_prime_Vec: Vec<Scalar> = a_Vec
+    // 4. Compute masked version of `a` and `b` using r' and r''
+    //
+    let masked_a_Vec: Vec<Scalar> = a_Vec
         .iter()
         .zip(r_prime.iter())
         .map(|(a, r)| beta * a + r)
         .collect();
-
-    let b_prime_Vec: Vec<Scalar> = b_Vec
+    let masked_b_Vec: Vec<Scalar> = b_Vec
         .iter()
         .zip(r_prime_prime.iter())
         .map(|(b, r)| beta * b + r)
         .collect();
 
-    let P = ((beta * C_w) + C_r + (beta * beta * t * Q)).compress();
+    // Since we are no longer proving knowledge of `a` and `b`; it is now masked `a` and masked `b`.
+    // We need to modify the commitment `P` and the result of the inner product argument `t` to match this
+    //
+    // 5. Compute modified `t` value
+    //
+    let beta_sq_t = beta * beta * t;
 
+    //6.  Compute modified commitment
+    //
+    let P = ((beta * C_w) + C_r + (beta_sq_t * Q)).compress();
     transcript.append_message(b"P", P.as_bytes());
 
-    let no_zk_proof = no_zk::create(transcript, G_Vec, H_Vec, Q, a_prime_Vec, b_prime_Vec);
-
+    //6. Call IPA_NoZK as a sub-protocol
+    //
+    let no_zk_proof = no_zk::create(transcript, G_Vec, H_Vec, Q, masked_a_Vec, masked_b_Vec);
     AlmZK {
         C_r: C_r.compress(),
         NoZK: no_zk_proof,
@@ -85,16 +87,26 @@ impl AlmZK {
         C_w: RistrettoPoint,
         t: Scalar,
     ) -> bool {
+        //1. Decompress the commitment
+        //
         let C_r = self.C_r.decompress().unwrap();
-
         transcript.append_message(b"C_r", self.C_r.as_bytes());
+
+        //3. Compute challenge based on C_r
+        //
         let beta = transcript.challenge_scalar(b"beta");
 
+        // 4. Compute modified `t` value
+        //
         let beta_sq_t = beta * beta * t;
 
+        // 5. Compute modified commitment
+        //
         let P = (beta * C_w) + C_r + (beta_sq_t * Q);
         transcript.append_message(b"P", P.compress().as_bytes());
 
+        //6. Call IPA_NoZk as a sub-protocol
+        //
         self.NoZK
             .verify(transcript, G_Vec, H_Vec, Q, n, P, beta_sq_t)
     }

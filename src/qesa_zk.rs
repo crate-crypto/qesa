@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::inner_product_argument::qesa_inner;
+use crate::ipa::qesa_inner;
 use crate::matrix::*;
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;

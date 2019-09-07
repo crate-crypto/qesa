@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::inner_product_argument::alm_zk;
+use crate::ipa::alm_zk;
 use crate::math_utils::vandemonde_challenge;
 use crate::matrix::*;
 use crate::transcript::TranscriptProtocol;
@@ -260,7 +260,7 @@ mod tests {
             for _ in 0..n {
                 // Use gram schmidt to create suitable solutions for each system of eqns
                 let x: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-                let row_of_eqns = crate::inner_product_argument::gramschmidt::orth(&witness, &x);
+                let row_of_eqns = crate::ipa::gramschmidt::orth(&witness, &x);
                 gamma_i.push(row_of_eqns)
             }
             bm.push(gamma_i);

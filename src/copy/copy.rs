@@ -1,5 +1,5 @@
 use crate::copy::mapping::{Mapping, MessageMap};
-use crate::inner_product_argument::qesa_inner;
+use crate::ipa::qesa_inner;
 use crate::math_utils::vandemonde_challenge;
 use crate::matrix::*;
 use crate::transcript::TranscriptProtocol;

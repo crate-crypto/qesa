@@ -1,5 +1,5 @@
 mod copy;
-mod inner_product_argument;
+mod ipa;
 mod math_utils;
 mod matrix;
 mod transcript;

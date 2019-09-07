@@ -14,6 +14,7 @@ use crate::math_utils::inner_product;
 // TODO: give each module(no_zk, qesa_inner, ipa_alm_zk, etc) a local crs struct that they can use and pass down to other modules
 
 /// NoZK is an optimisation over the bulletproofs IPA.
+#[derive(Clone)]
 pub struct NoZK {
     // From the literature this would be u_{-1}
     pub(crate) L_vec: Vec<CompressedRistretto>,

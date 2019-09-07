@@ -1,18 +1,13 @@
 #![allow(non_snake_case)]
-use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
     ristretto::{CompressedRistretto, RistrettoPoint},
     scalar::Scalar,
     traits::VartimeMultiscalarMul,
 };
 use merlin::Transcript;
+use crate::transcript::TranscriptProtocol;
 use std::iter;
-
 use crate::math_utils::inner_product;
-
-// TODO: Develop multiexponentiation formula, if any clean version is possible
-// TODO: give each module(no_zk, qesa_inner, ipa_alm_zk, etc) a local crs struct that they can use and pass down to other modules
-
 /// NoZK is an optimisation over the bulletproofs IPA.
 #[derive(Clone)]
 pub struct NoZK {
@@ -29,6 +24,7 @@ pub struct NoZK {
 // a and b are the witness prime and witness prime prime respectively
 // G_Vec, H_Vec and Q is g prime, g prime prime and Q of the crs respectively
 // This implementation will intentionally try to mirror the dalek-cryptography implementation in design choices and variable naming
+// making it easier to draw comparisons between the two and provide benchmarks
 pub fn create(
     transcript: &mut Transcript,
     mut G_Vec: Vec<RistrettoPoint>,
@@ -70,17 +66,17 @@ pub fn create(
         let (G_L, G_R) = G.split_at_mut(n);
         let (H_L, H_R) = H.split_at_mut(n);
 
-        let v_minus_one = inner_product(a_R, b_L);
-        let v_plus_one = inner_product(a_L, b_R);
+        let c_R = inner_product(a_R, b_L);
+        let c_L = inner_product(a_L, b_R);
 
         let L = RistrettoPoint::vartime_multiscalar_mul(
-            a_L.iter().chain(b_R.iter()).chain(iter::once(&v_plus_one)),
+            a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
             G_R.iter().chain(H_L.iter()).chain(iter::once(&Q)),
         )
         .compress();
 
         let R = RistrettoPoint::vartime_multiscalar_mul(
-            a_R.iter().chain(b_L.iter()).chain(iter::once(&v_minus_one)),
+            a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
             G_L.iter().chain(H_R.iter().chain(iter::once(&Q))),
         )
         .compress();
@@ -166,8 +162,8 @@ fn generate_challenges(proof: &NoZK, transcript: &mut Transcript) -> Vec<Scalar>
     let mut challenges: Vec<Scalar> = Vec::new();
 
     for (L, R) in proof.L_vec.iter().zip(proof.R_vec.iter()) {
-        transcript.append_message(b"u_minus_one", L.as_bytes());
-        transcript.append_message(b"u_plus_one", R.as_bytes());
+        transcript.append_message(b"L", L.as_bytes());
+        transcript.append_message(b"R", R.as_bytes());
 
         let x_i = transcript.challenge_scalar(b"x_i");
         challenges.push(x_i);
@@ -201,7 +197,7 @@ mod tests {
         let H: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
-        let mut transcript = Transcript::new(b"ip_no_zk");
+        let mut prover_transcript = Transcript::new(b"ip_no_zk");
 
         let P = RistrettoPoint::vartime_multiscalar_mul(
             a.iter().chain(b.iter()).chain(iter::once(&t)),
@@ -210,13 +206,13 @@ mod tests {
 
         // We add the compressed point to the transcript, because we need some non-trivial input to generate alpha
         // If this is not done, then the prover always will be able to predict what the first challenge will be
-        transcript.append_message(b"P", P.compress().as_bytes());
+        prover_transcript.append_message(b"P", P.compress().as_bytes());
 
-        let proof = create(&mut transcript, G.clone(), H.clone(), &Q, a, b);
+        let proof = create(&mut prover_transcript, G.clone(), H.clone(), &Q, a, b);
 
-        transcript = Transcript::new(b"ip_no_zk");
-        transcript.append_message(b"P", P.compress().as_bytes());
+        let mut verifier_transcript = Transcript::new(b"ip_no_zk");
+        verifier_transcript.append_message(b"P", P.compress().as_bytes());
 
-        assert!(proof.verify(&mut transcript, &G, &H, &Q, n, P, t));
+        assert!(proof.verify(&mut verifier_transcript, &G, &H, &Q, n, P, t));
     }
 }

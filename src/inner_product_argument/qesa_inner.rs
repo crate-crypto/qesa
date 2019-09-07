@@ -9,15 +9,7 @@ use curve25519_dalek::{
     traits::VartimeMultiscalarMul,
 };
 use merlin::Transcript;
-/*
 
-Notes: This is a sub-section of qesa_zk.
-- First six bulletpoints on protocol 4.5 before we Run protocol IPA_ALM_ZK
-- Module structure will most likely change
-*/
-// XXX: We need to formalise the way data is added to the transcript
-// XXX: The code currently does not make use of the efficiency of sparse matrices
-// XXX: Maybe this should be moved to inner_product_argument as it is essentially making sure <w, gamma * w> =0
 #[derive(Clone)]
 pub struct Inner {
     pub(crate) alm_zk: alm_zk::AlmZK,
@@ -34,46 +26,69 @@ pub fn create(
     w: Vec<Scalar>,
     r_prime: Vec<Scalar>,
 ) -> Inner {
+    
     let n = G_Vec.len();
-
     assert_eq!(w.len(), n - 2);
     assert_eq!(r_prime.len(), 2);
 
+    // 1. Compute w' (extended witness)
+    //
     let w_prime = [&w[..], &r_prime[..]].concat();
-    assert_eq!(w_prime.len(), n);
 
+    //2. Compute commitment (C'_w) to w'
+    //
     let c_prime_w = RistrettoPoint::vartime_multiscalar_mul(w_prime.iter(), G_Vec.iter());
     transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
 
+    //3. Compute challenges based on C'_w
+    //
     let x_challenges: Vec<Scalar> = vandemonde_challenge(transcript.challenge_scalar(b"x"), n);
     assert_eq!(x_challenges.len(), n);
 
+    // 4. batch each matrix into a single matrix using the challenges
+    //
+    // Given `k` matrices of size `n-2 x n-2`
+    // We use the challenges to batch all of them into one `n-2 x n-2` matrix
     let gamma = gamma_i.block_matrix_batch(&x_challenges);
-    let beta = x_challenges[1];
 
-    // Change the first generator in g'
+    //5. Fix the first element of the witness to be one (see paper)
+    //
+    let beta = x_challenges[1];
     G_Vec[0] = G_Vec[0] * beta.invert();
 
-    // r_prime_prime is a rotation of r_prime by 90 degrees
+    //6. Compute r'' by rotating the r' by 90 degrees
+    //
     let r_prime_prime = vec![-r_prime[1], r_prime[0]];
 
+    // 7. Compute w'' (extended witness)
+    //
+    // Compute gamma * w
     let gamma_w = matrix_vector_mul(&gamma, &w);
-
+    //
     let w_prime_prime = [&gamma_w[..], &r_prime_prime[..]].concat();
 
+    //8. Compute commitment (C''_w) to w''
+    //
     let c_prime_prime_w =
         RistrettoPoint::vartime_multiscalar_mul(w_prime_prime.iter(), H_Vec.iter());
-
     transcript.append_message(b"c_prime_prime_w", c_prime_prime_w.compress().as_bytes());
 
+    //9. Compute `s` and `b` challenges
+    //
+    // `s` must be of size `n-2` and b must be of size `2`
     let s_challenges = vandemonde_challenge(transcript.challenge_scalar(b"s"), n - 2);
     let b_challenges = vandemonde_challenge(transcript.challenge_scalar(b"b"), 2);
 
+    //10. compute s' by concatenating `s` and `b`
+    //
     let s_prime = [&s_challenges[..], &b_challenges[..]].concat();
     assert_eq!(s_prime.len(), n);
 
+    // 11. Compute `a` , ``b and `t`
+    //
+    // Recall that <a,b> = t
+    //
     let gamma_prime = compute_gamma_prime(&gamma, n);
-
     let gamma_prime_t = matrix_transpose(&gamma_prime);
     let gamma_prime_t_s_prime = matrix_vector_mul(&gamma_prime_t, &s_prime);
 
@@ -81,15 +96,19 @@ pub fn create(
     let b = row_row_add(&w_prime_prime, &gamma_prime_t_s_prime);
     let t = crate::math_utils::inner_product(&a, &b);
 
+    // 12. Compute commitment (C_w) to witness
+    //
     let C_w = RistrettoPoint::vartime_multiscalar_mul(
         a.iter().chain(b.iter()),
         G_Vec.iter().chain(H_Vec.iter()),
     );
+    transcript.append_message(b"c_w", C_w.compress().as_bytes());
 
-    let proof = alm_zk::create(transcript, G_Vec, H_Vec, Q, C_w, a, b, t);
-
+    //13. Call IPA_AlmZK as a sub-protocol
+    //
+    let alm_zk_proof = alm_zk::create(transcript, G_Vec, H_Vec, Q, C_w, a, b, t);
     Inner {
-        alm_zk: proof,
+        alm_zk: alm_zk_proof,
         c_prime_w: c_prime_w.compress(),
         c_prime_prime_w: c_prime_prime_w.compress(),
     }
@@ -106,31 +125,42 @@ impl Inner {
     ) -> bool {
         let n = H_Vec.len();
 
+        //1. Decompress the commitment (C'_w)
+        //
+        transcript.append_message(b"c_prime_w", self.c_prime_w.as_bytes());
         let c_prime_w = self.c_prime_w.decompress().unwrap();
-        transcript.append_message(b"c_prime_w", c_prime_w.compress().as_bytes());
 
-        let c_prime_prime_w = self.c_prime_prime_w.decompress().unwrap();
-
+        //2. Compute challenges based on C'_w
+        //
         let x_challenges: Vec<Scalar> = vandemonde_challenge(transcript.challenge_scalar(b"x"), n);
-        assert_eq!(x_challenges.len(), n);
 
+        // 3. batch each matrix into a single matrix using the challenges
+        //
         let gamma = gamma_i.block_matrix_batch(&x_challenges);
 
+        //4. Fix the first element of the witness to be one (see paper)
+        //
         let beta = x_challenges[1];
-
-        // Change the first generator in g'
         G_Vec[0] = G_Vec[0] * beta.invert();
 
+        //5. Decompress the commitment (C''_w)
+        //
+        let c_prime_prime_w = self.c_prime_prime_w.decompress().unwrap();
         let c_prime_w = c_prime_w - (beta - Scalar::one()) * G_Vec[0];
-
         transcript.append_message(b"c_prime_prime_w", c_prime_prime_w.compress().as_bytes());
 
+        //6. Compute `s` and `b` challenges
+        //
         let s_challenges = vandemonde_challenge(transcript.challenge_scalar(b"s"), n - 2);
         let b_challenges = vandemonde_challenge(transcript.challenge_scalar(b"b"), 2);
 
+        //7. compute s' by concatenating `s` and `b`
+        //
         let s_prime = [&s_challenges[..], &b_challenges[..]].concat();
         assert_eq!(s_prime.len(), n);
 
+        // 8. Compute `t`
+        //
         let gamma_prime = compute_gamma_prime(&gamma, n);
 
         let gamma_prime_t = matrix_transpose(&gamma_prime);
@@ -141,18 +171,23 @@ impl Inner {
 
         let t = -crate::math_utils::inner_product(&s_challenges, &gamma_t_s);
 
-        let mut C_w = c_prime_w + c_prime_prime_w
-            - RistrettoPoint::vartime_multiscalar_mul(s_prime.iter(), G_Vec.iter());
-        C_w = C_w
+        // 9. Compute commitment (C_w) to witness
+        //
+        let mut C_w = c_prime_w
+            + c_prime_prime_w
             + RistrettoPoint::vartime_multiscalar_mul(gamma_prime_t_s_prime.iter(), H_Vec.iter());
+        C_w = C_w - RistrettoPoint::vartime_multiscalar_mul(s_prime.iter(), G_Vec.iter());
+        transcript.append_message(b"c_w", C_w.compress().as_bytes());
 
+        //10. Call IPA_AlmZK as a sub-protocol
+        //
         self.alm_zk
             .verify(transcript, &G_Vec, &H_Vec, &Q, n, C_w, t)
     }
 }
 
 fn compute_gamma_prime(gamma: &Vec<Vec<Scalar>>, n: usize) -> Vec<Vec<Scalar>> {
-    // Pad the gamma rows with zeroes at the end
+    // Pad the gamma rows with zeroes at the end (iss#1)
     let mut gamma_prime: Vec<Vec<Scalar>> = gamma
         .iter()
         .map(|row| {
@@ -196,10 +231,10 @@ mod tests {
 
         let r_prime: Vec<Scalar> = (0..2).map(|_| Scalar::random(&mut rng)).collect();
 
-        let mut transcript = Transcript::new(b"qesa_inner");
+        let mut prover_transcript = Transcript::new(b"qesa_inner");
 
         let proof = create(
-            &mut transcript,
+            &mut prover_transcript,
             G.clone(),
             H.clone(),
             &Q,
@@ -208,9 +243,8 @@ mod tests {
             r_prime,
         );
 
-        let mut transcript = Transcript::new(b"qesa_inner");
-
-        assert!(proof.verify(&mut transcript, G, H, &Q, &matrix))
+        let mut verifier_transcript = Transcript::new(b"qesa_inner");
+        assert!(proof.verify(&mut verifier_transcript, G, H, &Q, &matrix))
     }
     // Creates a system of quadratic equations with solutions
     // and a witness

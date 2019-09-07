@@ -87,10 +87,10 @@ impl AlmZK {
         C_w: RistrettoPoint,
         t: Scalar,
     ) -> bool {
-        //1. Decompress the commitment
+        //1. Decompress the commitment (C_r)
         //
-        let C_r = self.C_r.decompress().unwrap();
         transcript.append_message(b"C_r", self.C_r.as_bytes());
+        let C_r = self.C_r.decompress().unwrap();
 
         //3. Compute challenge based on C_r
         //
@@ -128,7 +128,7 @@ mod tests {
         let G: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
         let H: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
 
-        let mut transcript = Transcript::new(b"ip_alm_zk");
+        let mut prover_transcript = Transcript::new(b"ip_alm_zk");
 
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
@@ -137,10 +137,18 @@ mod tests {
             G.iter().chain(H.iter()),
         );
 
-        let proof = super::create(&mut transcript, G.clone(), H.clone(), &Q, C_w, a, b, t);
+        let proof = super::create(
+            &mut prover_transcript,
+            G.clone(),
+            H.clone(),
+            &Q,
+            C_w,
+            a,
+            b,
+            t,
+        );
 
-        transcript = Transcript::new(b"ip_alm_zk");
-
-        assert!(proof.verify(&mut transcript, &G, &H, &Q, n, C_w, t));
+        let mut verifier_transcript = Transcript::new(b"ip_alm_zk");
+        assert!(proof.verify(&mut verifier_transcript, &G, &H, &Q, n, C_w, t));
     }
 }

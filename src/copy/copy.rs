@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use crate::copy::mapping::{Mapping, MessageMap};
 use crate::ipa::qesa_inner;
 use crate::math_utils::vandemonde_challenge;
@@ -58,7 +59,7 @@ pub fn create(
         .cloned()
         .collect();
     for (msg, msg_map) in all_messages.iter().zip(map.msgs_map.iter()) {
-        w_prime[msg_map.position as usize] = *msg;
+        w_prime[msg_map.position_in_witness as usize] = *msg;
     }
 
     // 2. Compute commitment to witness
@@ -89,13 +90,13 @@ pub fn create(
         // For each message. We need to figure out what position
         // it is in, in terms of it's original commitment
         // This is the same as the key_id or generator indice (see paper - orange values)
-        let key_id_position = msg_map.key_id;
+        let key_id_position = msg_map.commitment_index;
         // This position is it's usable position in the witness vector. (see paper - green values)
-        let msg_position = msg_map.position;
+        let msg_position = msg_map.position_in_witness;
         // For each row of messages, the challenge value is the same
         // In order to determine what challenge is needed
         // We can fetch the crs_id
-        let crs_id = msg_map.crs_id;
+        let crs_id = msg_map.commitment_crs_id;
 
         let w_msg_pos = w_prime[msg_position as usize];
 
@@ -107,20 +108,20 @@ pub fn create(
     //
     let zeroes: Vec<Scalar> = (0..n - 2).map(|_| Scalar::zero()).collect();
 
-    for key_id in map.unique_key_indices {
+    for com_index in map.unique_commitment_indices {
         let mut matrix: Vec<Vec<Scalar>> = Vec::new();
         let mut new_eqn: Vec<Scalar> = (0..n - 2).map(|_| Scalar::zero()).collect();
-        new_eqn[key_id as usize] = -Scalar::one();
+        new_eqn[com_index as usize] = -Scalar::one();
 
-        // Get all messages for this key_id
-        let msgs_for_key_id: Vec<&MessageMap> = map
+        // Get all messages for this commitment index
+        let msgs_for_comm_index: Vec<&MessageMap> = map
             .msgs_map
             .iter()
-            .filter(|x| (x.key_id == key_id))
+            .filter(|x| (x.commitment_index == com_index))
             .collect();
 
-        for msg in msgs_for_key_id.iter() {
-            new_eqn[msg.position as usize] = alpha_challenges[msg.crs_id as usize];
+        for msg in msgs_for_comm_index.iter() {
+            new_eqn[msg.position_in_witness as usize] = alpha_challenges[msg.commitment_crs_id as usize];
         }
 
         // Add to matrix
@@ -178,20 +179,20 @@ impl Copy {
         // 4. Modify gamma to match the new commited values
         let zeroes: Vec<Scalar> = (0..n - 2).map(|_| Scalar::zero()).collect();
 
-        for key_id in map.unique_key_indices {
+        for key_id in map.unique_commitment_indices {
             let mut matrix: Vec<Vec<Scalar>> = Vec::new();
             let mut new_eqn: Vec<Scalar> = (0..n - 2).map(|_| Scalar::zero()).collect();
             new_eqn[key_id as usize] = -Scalar::one();
 
-            // Get all messages for this key_id
-            let msgs_for_key_id: Vec<&MessageMap> = map
+            // Get all messages for this commitment index
+            let msgs_for_comm_index: Vec<&MessageMap> = map
                 .msgs_map
                 .iter()
-                .filter(|x| (x.key_id == key_id))
+                .filter(|x| (x.commitment_index == key_id))
                 .collect();
 
-            for msg in msgs_for_key_id.iter() {
-                new_eqn[msg.position as usize] = alpha_challenges[msg.crs_id as usize];
+            for msg in msgs_for_comm_index.iter() {
+                new_eqn[msg.position_in_witness as usize] = alpha_challenges[msg.commitment_crs_id as usize];
             }
 
             // Add to matrix

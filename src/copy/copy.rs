@@ -16,7 +16,6 @@ pub struct Copy {
     c_w: CompressedRistretto,
     inner: inner::Inner,
 }
-#[allow(dead_code)]
 pub fn create(
     transcript: &mut Transcript,
     mut G_Vec: Vec<RistrettoPoint>,
@@ -145,7 +144,6 @@ pub fn create(
         inner: proof,
     }
 }
-#[allow(dead_code)]
 impl Copy {
     fn verify(
         &self,

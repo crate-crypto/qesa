@@ -4,7 +4,6 @@ use std::collections::BTreeSet;
 // XXX: Is a u16 good enough as the type for the mapping? For: sha256 was 26k, can we expect circuits to be bigger than sha256? Probably not.
 //XXX: We can simplify this code, maybe we can compute the mapping more efficiently or in a more readable manner using iterators.
 
-#[allow(dead_code)]
 pub fn commit(
     G_Vec: &[RistrettoPoint],
     indices: &BTreeSet<u16>,
@@ -46,7 +45,6 @@ pub struct MessageMap {
     pub(crate) position: u16,
 }
 
-#[allow(dead_code)]
 pub fn compute_mapping(
     G_Vec: &[RistrettoPoint],
     witness_size: usize,

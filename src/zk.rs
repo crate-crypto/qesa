@@ -1,10 +1,10 @@
-use crate::inner;
+use crate::inner_product_argument::qesa_inner;
 use crate::matrix::*;
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;
 
 pub struct Zk {
-    inner: inner::Inner,
+    inner: qesa_inner::Inner,
 }
 
 pub fn create(
@@ -16,7 +16,7 @@ pub fn create(
     w: Vec<Scalar>,
     r_prime: Vec<Scalar>,
 ) -> Zk {
-    let proof = inner::create(transcript, G_Vec, H_Vec, &Q, gamma_i, w, r_prime);
+    let proof = qesa_inner::create(transcript, G_Vec, H_Vec, &Q, gamma_i, w, r_prime);
 
     Zk { inner: proof }
 }

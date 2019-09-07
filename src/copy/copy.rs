@@ -1,5 +1,5 @@
 use crate::copy::mapping::{Mapping, MessageMap};
-use crate::inner;
+use crate::inner_product_argument::qesa_inner;
 use crate::math_utils::vandemonde_challenge;
 use crate::matrix::*;
 use crate::transcript::TranscriptProtocol;
@@ -14,7 +14,7 @@ use merlin::Transcript;
 #[derive(Clone)]
 pub struct Copy {
     c_w: CompressedRistretto,
-    inner: inner::Inner,
+    inner: qesa_inner::Inner,
 }
 pub fn create(
     transcript: &mut Transcript,
@@ -142,7 +142,7 @@ pub fn create(
     assert_eq!(w_prime.len(), n - 2);
     //5. Run Qesa_inner as a sub protocol
     //
-    let proof = inner::create(transcript, G_Vec, H_Vec, Q, &gamma_i, w_prime, r_prime);
+    let proof = qesa_inner::create(transcript, G_Vec, H_Vec, Q, &gamma_i, w_prime, r_prime);
     Copy {
         c_w: c_w.compress(),
         inner: proof,
@@ -204,7 +204,7 @@ impl Copy {
             // Add matrix to block matrix
             gamma_i.push(matrix);
         }
-        let proof_inner = inner::Inner {
+        let proof_inner = qesa_inner::Inner {
             alm_zk: self.inner.alm_zk.clone(),
             c_prime_w: commitment.compress(),
             c_prime_prime_w: self.inner.c_prime_prime_w,

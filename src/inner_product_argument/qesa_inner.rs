@@ -1,23 +1,15 @@
 #![allow(non_snake_case)]
-use crate::inner_product_argument::alm_zk;
-use crate::math_utils::vandemonde_challenge;
-use crate::matrix::*;
-use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
     ristretto::{CompressedRistretto, RistrettoPoint},
     scalar::Scalar,
     traits::VartimeMultiscalarMul,
 };
+use crate::inner_product_argument::alm_zk;
+use crate::math_utils::vandemonde_challenge;
+use crate::matrix::*;
+use crate::transcript::TranscriptProtocol;
 use merlin::Transcript;
-/*
 
-Notes: This is a sub-section of qesa_zk.
-- First six bulletpoints on protocol 4.5 before we Run protocol IPA_ALM_ZK
-- Module structure will most likely change
-*/
-// XXX: We need to formalise the way data is added to the transcript
-// XXX: The code currently does not make use of the efficiency of sparse matrices
-// XXX: Maybe this should be moved to inner_product_argument as it is essentially making sure <w, gamma * w> =0
 #[derive(Clone)]
 pub struct Inner {
     pub(crate) alm_zk: alm_zk::AlmZK,

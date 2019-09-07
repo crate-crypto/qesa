@@ -1,14 +1,15 @@
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::VartimeMultiscalarMul};
 use std::collections::BTreeSet;
-
+//XXX: This file in particular should be cleaned up, as first pass is very rough.
+// XXX: Is a u16 good enough as the type for the mapping? For: sha256 was 26k, can we expect circuits to be bigger than sha256? Probably not.
 //XXX: We can simplify this code, maybe we can compute the mapping more efficiently or in a more readable manner using iterators.
 
 #[allow(dead_code)]
 pub fn commit(
     G_Vec: &[RistrettoPoint],
-    indices: BTreeSet<u16>,
-    msg: Vec<Scalar>,
-    rand: Scalar,
+    indices: &BTreeSet<u16>,
+    msg: &[Scalar],
+    rand: &Scalar,
 ) -> RistrettoPoint {
     assert_eq!(indices.len(), msg.len());
 
@@ -21,15 +22,15 @@ pub fn commit(
 
     commitment
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mapping {
-    num_commitments: usize,
-    msg_map: Vec<MessageMap>,
-    unique_key_indices: BTreeSet<u16>,
-    last_index: u16,
+    pub(crate) num_commitments: usize,
+    pub(crate) msgs_map: Vec<MessageMap>,
+    pub(crate) unique_key_indices: BTreeSet<u16>,
+    pub(crate) last_index: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 // Stores the relevant information about a specific message
 // `key_id` refers to the indice of the point which committed the message
 // If P = m * G[2] then key_id = 2
@@ -39,10 +40,10 @@ pub struct Mapping {
 // The crs_id refers to the position of the specific `crs` that was used for a message in a commitment.
 // position refers to the position of the message in the witness. This is computed in `compute_mapping`
 pub struct MessageMap {
-    msg_id: usize,
-    key_id: u16,
-    crs_id: u16,
-    position: u16,
+    pub(crate) msg_id: usize,
+    pub(crate) key_id: u16,
+    pub(crate) crs_id: u16,
+    pub(crate) position: u16,
 }
 
 #[allow(dead_code)]
@@ -154,7 +155,7 @@ pub fn compute_mapping(
 
     Mapping {
         num_commitments: num_commitments,
-        msg_map: msgs_map,
+        msgs_map: msgs_map,
         unique_key_indices: unique_indices,
         last_index: last_index,
     }
@@ -200,27 +201,31 @@ fn test_random_compute_mapping() {
     // Check that each message has been assigned a position
     let total_messages: usize = sets_of_indices.iter().map(|indices| indices.len()).sum();
     for msg_id in 0..total_messages {
-        let msg_map = map.msg_map.iter().find(|&x| x.msg_id == msg_id);
+        let msg_map = map.msgs_map.iter().find(|&x| x.msg_id == msg_id);
         assert!(msg_map.is_some());
     }
 
     // Check that the last index corresponds to the position of the last message
     let last_msg_id = total_messages - 1;
-    assert_eq!(map.msg_map[last_msg_id].position, map.last_index);
+    assert_eq!(map.msgs_map[last_msg_id].position, map.last_index);
 
     // There should only be 4 crs_ids from 0..3 since we only have four commitments
     // They should also be ordered by msg_id and ascending
     // This code essentially `splits` the vector whereever the crs_id should be different
     // We will then have a vector of vectors of messagemaps
     // XXX: Maybe this is too complicated and we should refactor to simplify?
-    let mut map_msg : &[MessageMap] = &map.msg_map;
-    let chunked_maps : Vec<_>= sets_of_indices.iter().enumerate().map(|(i,set_of_indice)| {
-        let num_of_indice = set_of_indice.len();
-        let (head, tail) = map_msg.split_at(num_of_indice);
-        map_msg = tail;
-        head
-    }).collect();
-    for (crs_id,maps) in chunked_maps.iter().enumerate(){
+    let mut map_msg: &[MessageMap] = &map.msgs_map;
+    let chunked_maps: Vec<_> = sets_of_indices
+        .iter()
+        .enumerate()
+        .map(|(i, set_of_indice)| {
+            let num_of_indice = set_of_indice.len();
+            let (head, tail) = map_msg.split_at(num_of_indice);
+            map_msg = tail;
+            head
+        })
+        .collect();
+    for (crs_id, maps) in chunked_maps.iter().enumerate() {
         for map in maps.iter() {
             assert!(map.crs_id == crs_id as u16)
         }

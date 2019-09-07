@@ -4,6 +4,7 @@ use crate::matrix::*;
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;
 
+// QESA_ZK is a glorified wrapper around Qesa_Inner
 pub struct Zk {
     inner: qesa_inner::Inner,
 }
@@ -15,11 +16,19 @@ pub fn create(
     Q: RistrettoPoint,
     gamma_i: &BlockMatrix,
     w: Vec<Scalar>,
-    r_prime: Vec<Scalar>,
 ) -> Zk {
-    let proof = qesa_inner::create(transcript, G_Vec, H_Vec, &Q, gamma_i, w, r_prime);
+    
+    // 1. Compute r'
+    //    
+    let mut rng = rand::thread_rng();
+    let r_prime = vec![Scalar::random(&mut rng),Scalar::random(&mut rng)]; 
 
-    Zk { inner: proof }
+    // The paper states that we should generate C'_w in Qesa_Zk
+    // Then pass it to Qesa_Inner.
+    // However, it makes more sense to generate it in Qesa_Inner 
+
+    let qesa_inner_proof = qesa_inner::create(transcript, G_Vec, H_Vec, &Q, gamma_i, w, r_prime);
+    Zk { inner: qesa_inner_proof }
 }
 
 impl Zk {

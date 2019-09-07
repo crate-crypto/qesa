@@ -14,7 +14,6 @@ use merlin::Transcript;
 /// It cannot provide any guarantees regarding external input such as Pedersen Commitments
 /// Qesa_Copy acts as a layer on top to allow us to `map` commitments onto the witness
 /// Which we can then use in Qesa_ZK
-/// 
 #[derive(Clone)]
 pub struct Copy {
     C_w: CompressedRistretto,

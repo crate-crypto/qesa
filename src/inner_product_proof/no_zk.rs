@@ -1,13 +1,13 @@
 #![allow(non_snake_case)]
+use crate::math_utils::inner_product;
+use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
     ristretto::{CompressedRistretto, RistrettoPoint},
     scalar::Scalar,
     traits::VartimeMultiscalarMul,
 };
 use merlin::Transcript;
-use crate::transcript::TranscriptProtocol;
 use std::iter;
-use crate::math_utils::inner_product;
 /// NoZK is an optimisation over the bulletproofs IPA.
 #[derive(Clone)]
 pub struct NoZK {

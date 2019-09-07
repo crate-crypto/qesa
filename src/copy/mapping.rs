@@ -61,14 +61,13 @@ pub struct MessageMap {
     pub(crate) commitment_crs_id: u16,
     pub(crate) position_in_witness: u16,
 }
-
 pub fn compute_mapping(
-    G_Vec: &[RistrettoPoint],
+   n : usize,
     witness_size: usize,
     sets_of_indices: &[BTreeSet<u16>],
 ) -> Mapping {
 
-    let n = G_Vec.len() as u16;
+    let n = n as u16;
 
     let num_commitments = sets_of_indices.len();
 
@@ -180,7 +179,7 @@ fn test_random_compute_mapping() {
     // Note that since, randomness is used to generate the indices, the tests may sporadically pass with `n` <  18
     // if the same indice is added to the set
 
-    let map = compute_mapping(&G, 1, &sets_of_indices);
+    let map = compute_mapping(G.len(), 1, &sets_of_indices);
     assert_eq!(num_of_commitments, map.num_commitments);
 
     // Check that each message has been assigned a position

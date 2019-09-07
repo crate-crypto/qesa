@@ -3,7 +3,7 @@ mod inner_product_argument;
 mod math_utils;
 mod matrix;
 mod transcript;
-pub mod zk;
+pub mod qesa_zk;
 
 #[cfg(test)]
 mod tests {

@@ -22,7 +22,7 @@ Therefore <r_prime_prime, w_prime> = 0 = <r_prime, r_prime_prime>
 This allows us to mask the witness without introducing errors into the protcol.
 Similar to bulletproof, we will send these masked values into the IPA_NO_ZK which is just a prove of knowledge.
 */
-
+#[derive(Clone)]
 pub struct AlmZK {
     C_r: CompressedRistretto,
     NoZK: no_zk::NoZK,

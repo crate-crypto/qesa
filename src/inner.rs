@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 use crate::inner_product_proof::alm_zk;
+use crate::math_utils::vandemonde_challenge;
 use crate::matrix::*;
 use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
@@ -8,7 +9,6 @@ use curve25519_dalek::{
     traits::VartimeMultiscalarMul,
 };
 use merlin::Transcript;
-
 /*
 
 Notes: This is a sub-section of qesa_zk.
@@ -18,10 +18,11 @@ Notes: This is a sub-section of qesa_zk.
 // XXX: We need to formalise the way data is added to the transcript
 // XXX: The code currently does not make use of the efficiency of sparse matrices
 // XXX: Maybe this should be moved to Inner_product_proof as it is essentially making sure <w, gamma * w> =0
+#[derive(Clone)]
 pub struct Inner {
-    alm_zk: alm_zk::AlmZK,
-    c_prime_w: CompressedRistretto,
-    c_prime_prime_w: CompressedRistretto,
+    pub(crate) alm_zk: alm_zk::AlmZK,
+    pub(crate) c_prime_w: CompressedRistretto,
+    pub(crate) c_prime_prime_w: CompressedRistretto,
 }
 
 pub fn create(
@@ -48,7 +49,6 @@ pub fn create(
     assert_eq!(x_challenges.len(), n);
 
     let gamma = gamma_i.block_matrix_batch(&x_challenges);
-
     let beta = x_challenges[1];
 
     // Change the first generator in g'
@@ -149,28 +149,6 @@ impl Inner {
         self.alm_zk
             .verify(transcript, &G_Vec, &H_Vec, &Q, n, C_w, t)
     }
-}
-
-// Creates a vector from the scalar `x`
-// contents of vector = <x, x^2, x^3,.., x^n>
-// XXX: double check that it is fine to use a vandermonde matrix to
-// expand challenges instead of fetching each challenge from the distribution
-// so we don't need `n` different challenges
-fn vandemonde_challenge(x: Scalar, n: usize) -> Vec<Scalar> {
-    let mut challenges: Vec<Scalar> = Vec::with_capacity(n);
-
-    let mut x_n = x.clone();
-
-    challenges.push(x_n);
-
-    for _ in 1..n {
-        x_n = x_n * x_n;
-        challenges.push(x_n)
-    }
-
-    assert_eq!(challenges.len(), n);
-
-    challenges
 }
 
 fn compute_gamma_prime(gamma: &Vec<Vec<Scalar>>, n: usize) -> Vec<Vec<Scalar>> {

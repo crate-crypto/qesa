@@ -1,10 +1,8 @@
+#![allow(non_snake_case)]
 use crate::math_utils::inner_product;
 use curve25519_dalek::scalar::Scalar;
 
-// N.B we will use these dense matrix operations until sparse matrix functionality
-// is implemented.
-
-// multiplies every element in the matrix by the scalar
+// Multiplies every element in the matrix by the scalar
 // Returns the new matrix
 fn matrix_scalar_mul(matrix: &Vec<Vec<Scalar>>, x: &Scalar) -> Vec<Vec<Scalar>> {
     matrix
@@ -58,19 +56,19 @@ pub fn matrix_transpose(matrix: &Vec<Vec<Scalar>>) -> Vec<Vec<Scalar>> {
     transpose
 }
 
-pub struct block_matrix {
+pub struct BlockMatrix {
     pub block: Vec<Vec<Vec<Scalar>>>,
 }
 
-impl block_matrix {
-    pub fn new() -> block_matrix {
-        block_matrix { block: Vec::new() }
+impl BlockMatrix {
+    pub fn new() -> BlockMatrix {
+        BlockMatrix { block: Vec::new() }
     }
     pub fn push(&mut self, matrix: Vec<Vec<Scalar>>) {
         self.block.push(matrix)
     }
-    pub fn with(matrix: Vec<Vec<Scalar>>) -> block_matrix {
-        let mut b = block_matrix { block: Vec::new() };
+    pub fn with(matrix: Vec<Vec<Scalar>>) -> BlockMatrix {
+        let mut b = BlockMatrix { block: Vec::new() };
 
         b.block.push(matrix);
         b

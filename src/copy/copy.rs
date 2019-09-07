@@ -22,7 +22,7 @@ pub fn create(
     H_Vec: Vec<RistrettoPoint>,
     Q: &RistrettoPoint,
     map: Mapping,
-    mut gamma_i: block_matrix,
+    mut gamma_i: BlockMatrix,
     mut w: Vec<Scalar>,
     commitments: Vec<(Vec<Scalar>, Scalar)>, // (messages, rand)
 ) -> Copy {
@@ -155,7 +155,7 @@ impl Copy {
         G_Vec: Vec<RistrettoPoint>,
         H_Vec: Vec<RistrettoPoint>,
         Q: &RistrettoPoint,
-        mut gamma_i: block_matrix,
+        mut gamma_i: BlockMatrix,
         map: Mapping,
         commitments: Vec<RistrettoPoint>,
     ) -> bool {
@@ -235,7 +235,7 @@ mod tests {
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
         // Create a empty block matrix (no equations)
-        let bm = block_matrix::new();
+        let bm = BlockMatrix::new();
 
         // Generate the `messages` and random scalars for the commitments
         let num_commitments = 2;
@@ -300,7 +300,7 @@ mod tests {
 
         // Verify
         let mut transcript = Transcript::new(b"copy");
-        let bm = block_matrix::new();
+        let bm = BlockMatrix::new();
         assert!(proof.verify(&mut transcript, G, H, &Q, bm, map.clone(), commitments));
     }
     #[test]
@@ -318,7 +318,7 @@ mod tests {
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
         // Create a empty block matrix (no equations)
-        let bm = block_matrix::new();
+        let bm = BlockMatrix::new();
 
         // Generate the `message` and random scalar for the commitment
         let message: Vec<Scalar> = vec![Scalar::from(1 as u8), Scalar::from(1 as u8)];
@@ -354,7 +354,7 @@ mod tests {
 
         // Verify
         let mut transcript = Transcript::new(b"copy");
-        let bm = block_matrix::new();
+        let bm = BlockMatrix::new();
         assert!(proof.verify(&mut transcript, G, H, &Q, bm, map.clone(), commitments));
     }
     // Creates a pair of vectors, each of size `n` with random elements.

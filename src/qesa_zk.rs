@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use crate::inner_product_argument::qesa_inner;
 use crate::matrix::*;
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
@@ -12,7 +13,7 @@ pub fn create(
     G_Vec: Vec<RistrettoPoint>,
     H_Vec: Vec<RistrettoPoint>,
     Q: RistrettoPoint,
-    gamma_i: &block_matrix,
+    gamma_i: &BlockMatrix,
     w: Vec<Scalar>,
     r_prime: Vec<Scalar>,
 ) -> Zk {
@@ -28,7 +29,7 @@ impl Zk {
         G_Vec: Vec<RistrettoPoint>,
         H_Vec: Vec<RistrettoPoint>,
         Q: &RistrettoPoint,
-        gamma_i: &block_matrix,
+        gamma_i: &BlockMatrix,
     ) -> bool {
         self.inner.verify(transcript, G_Vec, H_Vec, Q, gamma_i)
     }

@@ -22,11 +22,11 @@ pub fn create(
     mut G_Vec: Vec<RistrettoPoint>,
     H_Vec: Vec<RistrettoPoint>,
     Q: &RistrettoPoint,
-    gamma_i: &block_matrix,
+    gamma_i: &BlockMatrix,
     w: Vec<Scalar>,
     r_prime: Vec<Scalar>,
 ) -> Inner {
-    
+
     let n = G_Vec.len();
     assert_eq!(w.len(), n - 2);
     assert_eq!(r_prime.len(), 2);
@@ -121,7 +121,7 @@ impl Inner {
         mut G_Vec: Vec<RistrettoPoint>,
         H_Vec: Vec<RistrettoPoint>,
         Q: &RistrettoPoint,
-        gamma_i: &block_matrix,
+        gamma_i: &BlockMatrix,
     ) -> bool {
         let n = H_Vec.len();
 
@@ -248,12 +248,12 @@ mod tests {
     }
     // Creates a system of quadratic equations with solutions
     // and a witness
-    fn helper_create_solutions(n: usize, num_of_matrices: usize) -> (Vec<Scalar>, block_matrix) {
+    fn helper_create_solutions(n: usize, num_of_matrices: usize) -> (Vec<Scalar>, BlockMatrix) {
         let mut rng = rand::thread_rng();
         let mut witness: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         witness[0] = Scalar::one();
 
-        let mut bm = block_matrix::new();
+        let mut bm = BlockMatrix::new();
 
         for _ in 0..num_of_matrices {
             let mut gamma_i: Vec<Vec<Scalar>> = Vec::new();

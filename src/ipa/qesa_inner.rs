@@ -215,7 +215,7 @@ fn compute_gamma_prime(gamma: &Vec<Vec<Scalar>>, n: usize) -> Vec<Vec<Scalar>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math_utils::*;
+    use crate::math_utils::inner_product;
     use sha3::Sha3_512;
     #[test]
     fn test_create_qesa_inner_proof() {

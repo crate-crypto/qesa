@@ -115,7 +115,7 @@ impl AlmZK {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math_utils::*;
+    use crate::math_utils::inner_product;
     use sha3::Sha3_512;
     #[test]
     fn test_create_almzk_proof() {

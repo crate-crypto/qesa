@@ -182,7 +182,7 @@ fn vector_vector_add(a: &mut [RistrettoPoint], b: &mut [RistrettoPoint]) -> Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math_utils::*;
+    use crate::math_utils::inner_product;
     use sha3::Sha3_512;
     use std::iter;
     #[test]
@@ -191,7 +191,7 @@ mod tests {
         let n = 4;
 
         let mut rng = rand::thread_rng();
-        
+
         let a: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let b: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
 

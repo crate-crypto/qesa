@@ -10,19 +10,31 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 // XXX: double check that it is fine to use a vandermonde matrix in regards to testing distributions to
 // expand challenges instead of fetching each challenge from the distribution
 // so we don't need `n` different challenges
-pub fn vandemonde_challenge(x: Scalar, n: usize) -> Vec<Scalar> {
+pub fn vandemonde_challenge(mut x: Scalar, n: usize) -> Vec<Scalar> {
+    
     let mut challenges: Vec<Scalar> = Vec::with_capacity(n);
-
-    let mut x_n = x.clone();
-
-    challenges.push(x_n);
-
-    for _ in 1..n {
-        x_n = x_n * x_n;
-        challenges.push(x_n)
+    for _ in 0..n {
+        challenges.push(x);
+        x = x * x;
     }
+    challenges
+}
 
+#[test]
+fn test_vandermonde() {
+
+    let n = 32;
+
+    let two = Scalar::from(2 as u8);
+
+    let challenges = vandemonde_challenge(two, n);
     assert_eq!(challenges.len(), n);
 
-    challenges
+    let mut two_n = two;
+
+    for i in 0..challenges.len() {
+        assert_eq!(two_n, challenges[i]);
+        two_n = two_n * two_n;
+    }
+    
 }

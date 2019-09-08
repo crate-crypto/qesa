@@ -187,11 +187,15 @@ mod tests {
     use std::iter;
     #[test]
     fn test_create_nozk_proof() {
-        let mut rng = rand::thread_rng();
 
         let n = 4;
 
-        let (a, b, t) = helper_dot_product(n);
+        let mut rng = rand::thread_rng();
+        
+        let a: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let b: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+
+        let t = inner_product(&a, &b);
 
         let G: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
         let H: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();

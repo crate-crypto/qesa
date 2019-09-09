@@ -119,7 +119,6 @@ mod tests {
     use sha3::Sha3_512;
     #[test]
     fn test_create_almzk_proof() {
-
         let n = 4;
 
         let mut rng = rand::thread_rng();

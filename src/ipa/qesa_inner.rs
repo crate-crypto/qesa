@@ -26,7 +26,6 @@ pub fn create(
     w: Vec<Scalar>,
     r_prime: Vec<Scalar>,
 ) -> Inner {
-
     let n = G_Vec.len();
     assert_eq!(w.len(), n - 2);
     assert_eq!(r_prime.len(), 2);

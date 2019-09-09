@@ -187,7 +187,6 @@ mod tests {
     use std::iter;
     #[test]
     fn test_create_nozk_proof() {
-
         let n = 4;
 
         let mut rng = rand::thread_rng();

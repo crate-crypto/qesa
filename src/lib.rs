@@ -2,8 +2,8 @@ mod copy;
 mod ipa;
 mod math_utils;
 mod matrix;
-mod transcript;
 pub mod qesa_zk;
+mod transcript;
 
 #[cfg(test)]
 mod tests {

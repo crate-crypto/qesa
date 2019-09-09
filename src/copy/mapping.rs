@@ -3,23 +3,23 @@ use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::Vartim
 use std::collections::BTreeSet;
 
 /// The purpose of the mapping code is to map each message into the witness vector
-/// 
+///
 /// What is a message?
 /// A message is an element in a Pedersen commitment
 /// For example, if P = aG + bH , then we have 2 messages `a` and `b`
-/// 
+///
 /// In particular, we want to store three pieces of meta-data about a message; the commmitment_index, the position_in_witness and the commitment_crs_id
-/// 
+///
 /// The `commitment_index` is the indice of the point that was used to commit that message
 /// For example, Imagine we have a vector of points that we use to perform a Pedersen commitment `G`
 /// We can commit to a commitment using P = a * G[0] + b * G[1] + c * G[2]
-/// In this example, we have three message `a` , `b` and `c`. 
+/// In this example, we have three message `a` , `b` and `c`.
 /// The commitment_index for `a` is `0` because we used the point at the 0th index from the vector of points `G`
-/// 
-/// The `position_in_witness` is a value that is computed `compute_mapping` 
+///
+/// The `position_in_witness` is a value that is computed `compute_mapping`
 /// It refers to an available position in the witness that this message can be placed into
 /// This file only computes the mapping, Qesa_Copy places the messages in the relevant positions
-/// 
+///
 /// The `commitment_crs_id` is the id of the set that was used to commit the message
 /// In this proving system, one can commit using a continuos sequence of points: P = a * G[0] + b * G[1] + c * G[2]
 /// Or you can commit to a combination of points: P = a * G[3] + b * G[5] + c * G[2] + d * G[4]
@@ -62,11 +62,10 @@ pub struct MessageMap {
     pub(crate) position_in_witness: u16,
 }
 pub fn compute_mapping(
-   n : usize,
+    n: usize,
     witness_size: usize,
     sets_of_indices: &[BTreeSet<u16>],
 ) -> Mapping {
-
     let n = n as u16;
 
     let num_commitments = sets_of_indices.len();
@@ -77,7 +76,7 @@ pub fn compute_mapping(
         .map(|indices| indices.clone())
         .flatten()
         .collect();
-    
+
     // The first element in the witness is reserved and so users cannot commit to it.
     unique_indices.contains(&0);
 
@@ -119,7 +118,7 @@ pub fn compute_mapping(
         msg_map.position_in_witness = *av_pos;
     }
 
-    // Map each msg to it's assosciated commitment index. 
+    // Map each msg to it's assosciated commitment index.
     // Recall this is the index of the point which is used to commit the message in the commmitment
     let mut msgs_map_iter = msgs_map.iter_mut();
     for set_of_indices in sets_of_indices.iter() {
@@ -191,7 +190,10 @@ fn test_random_compute_mapping() {
 
     // Check that the last index corresponds to the position of the last message
     let last_msg_id = total_messages - 1;
-    assert_eq!(map.msgs_map[last_msg_id].position_in_witness, map.last_index);
+    assert_eq!(
+        map.msgs_map[last_msg_id].position_in_witness,
+        map.last_index
+    );
 
     // There should only be 4 crs_ids from 0..3 since we only have four commitments
     // They should also be ordered by msg_id and ascending

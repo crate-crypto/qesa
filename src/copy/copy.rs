@@ -30,14 +30,12 @@ pub fn create(
     mut w: Vec<Scalar>,
     openings: Vec<(Vec<Scalar>, Scalar)>, // (messages, rand)
 ) -> Copy {
-
     let n = G_Vec.len();
 
     assert_eq!(map.num_commitments, openings.len());
 
     // Ensure the first element in the witness is `1` (see paper)
     assert_eq!(w[0], Scalar::one());
-
 
     // 1. Pad the witness with zeroes
     //
@@ -49,7 +47,7 @@ pub fn create(
     //
     let mut rng = rand::thread_rng();
     let r_prime: Vec<Scalar> = (0..2).map(|_| Scalar::random(&mut rng)).collect();
-    
+
     // 3. Compute w' (extended witness) using r'
     //
     let mut w_prime = [&w[..], &r_prime[..]].concat();
@@ -101,7 +99,7 @@ pub fn create(
         // For each row of messages, the challenge value is the same
         // In other words, for each commitment `P` the challenge is the same for all messages (see paper)
         // In order to determine what challenge is needed, we can fetch the commitment_crs_id
-        // commitment_crs_id = 0 corresponds to the first commitment and therefore the first challenge 
+        // commitment_crs_id = 0 corresponds to the first commitment and therefore the first challenge
         let commitment_crs_id = msg_map.commitment_crs_id;
 
         let msg = w_prime[msg_position as usize];
@@ -113,14 +111,13 @@ pub fn create(
     // 9. Add `copy matrices` to make sure that the verifier
     // can check that the aggregated values are equal to the aggregated committed values
     // Essentially, we add constraints/equations, so that the prover cannot use values that he has not commited to
-    // 
+    //
     // Since we are using dense matrices, we will need to add padding
     let zeroes: Vec<Scalar> = (0..n - 2).map(|_| Scalar::zero()).collect();
 
     for commitment_index in map.unique_commitment_indices {
-       
         let mut matrix: Vec<Vec<Scalar>> = Vec::new();
-       
+
         let mut new_eqn: Vec<Scalar> = (0..n - 2).map(|_| Scalar::zero()).collect();
         new_eqn[commitment_index as usize] = -Scalar::one();
 
@@ -132,7 +129,6 @@ pub fn create(
             .collect();
 
         for msg in msgs_for_comm_index.iter() {
-            
             let alpha = alpha_challenges[msg.commitment_crs_id as usize];
 
             new_eqn[msg.position_in_witness as usize] = alpha;
@@ -175,7 +171,6 @@ impl Copy {
         map: Mapping,
         commitments: Vec<RistrettoPoint>,
     ) -> bool {
-        
         let n = G_Vec.len();
 
         //1. Add commited witness to the transcript
@@ -211,7 +206,6 @@ impl Copy {
                 .collect();
 
             for msg in msgs_for_comm_index.iter() {
-                
                 let alpha = alpha_challenges[msg.commitment_crs_id as usize];
 
                 new_eqn[msg.position_in_witness as usize] = alpha;
@@ -326,7 +320,15 @@ mod tests {
         // Verify
         let mut verifier_transcript = Transcript::new(b"copy");
         let bm = BlockMatrix::new();
-        assert!(proof.verify(&mut verifier_transcript, G, H, &Q, bm, map.clone(), commitments));
+        assert!(proof.verify(
+            &mut verifier_transcript,
+            G,
+            H,
+            &Q,
+            bm,
+            map.clone(),
+            commitments
+        ));
     }
     #[test]
     fn test_copy_proof_creation_single_commit() {

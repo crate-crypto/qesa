@@ -3,12 +3,12 @@ use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;
 // Linear Map Pre-Image Argument without zero knowledge
-struct NoZK {
+pub struct NoZK {
     L_Vec: Vec<Vec<RistrettoPoint>>,
     R_Vec: Vec<Vec<RistrettoPoint>>,
     w: Scalar,
 }
-fn create(
+pub fn create(
     transcript: &mut Transcript,
     mut A: Vec<Vec<RistrettoPoint>>,
     G_Vec: Vec<RistrettoPoint>,
@@ -136,7 +136,7 @@ impl NoZK {
 use sha3::Sha3_512;
 
 #[test]
-fn test_create_verify() {
+fn test_lmpa_no_zk_create_verify() {
     let n = 4;
     let mut rng = rand::thread_rng();
 

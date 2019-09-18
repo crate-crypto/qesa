@@ -1,10 +1,12 @@
 #![allow(non_snake_case)]
 use crate::math_utils::inner_product;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::Identity;
 
 // Multiplies every element in the matrix by the scalar
 // Returns the new matrix
-fn matrix_scalar_mul(matrix: &Vec<Vec<Scalar>>, x: &Scalar) -> Vec<Vec<Scalar>> {
+pub fn matrix_scalar_mul(matrix: &Vec<Vec<Scalar>>, x: &Scalar) -> Vec<Vec<Scalar>> {
     matrix
         .iter()
         .map(|row| row.iter().map(|elem| elem * x).collect())
@@ -34,7 +36,7 @@ pub fn row_row_sub(row_a: &[Scalar], row_b: &[Scalar]) -> Vec<Scalar> {
 
 // Takes two matrices and adds them together
 // The (i,j) entry of matrix A is added to the (i,j) entry of B
-fn matrix_matrix_add(A: &Vec<Vec<Scalar>>, B: &Vec<Vec<Scalar>>) -> Vec<Vec<Scalar>> {
+pub fn matrix_matrix_add(A: &Vec<Vec<Scalar>>, B: &Vec<Vec<Scalar>>) -> Vec<Vec<Scalar>> {
     assert_eq!(A.len(), B.len());
 
     A.iter()
@@ -92,4 +94,62 @@ impl BlockMatrix {
 
         sum_block
     }
+}
+
+// Point
+
+// Multiplies every element in the matrix by the scalar
+// Returns the new matrix
+pub fn matrixpoint_scalar_mul(
+    matrix: &Vec<Vec<RistrettoPoint>>,
+    x: &Scalar,
+) -> Vec<Vec<RistrettoPoint>> {
+    matrix
+        .iter()
+        .map(|row| row.iter().map(|elem| elem * x).collect())
+        .collect()
+}
+// Takes a matrix and a vector
+// Returns a new vector i.e. (Ax=b)
+pub fn matrixpoint_vector_mul(
+    matrix: &Vec<Vec<RistrettoPoint>>,
+    vec: &[Scalar],
+) -> Vec<RistrettoPoint> {
+    matrix
+        .iter()
+        .map(|row| {
+            let vals: Vec<RistrettoPoint> =
+                row.iter().zip(vec.iter()).map(|(a, b)| a * b).collect();
+
+            let mut ip = RistrettoPoint::identity();
+            for val in vals {
+                ip = ip + val;
+            }
+
+            ip
+        })
+        .collect()
+}
+// Takes two rows and adds them together
+// The (i) entry of row a is added to the i entry of row b
+pub fn rowpoint_rowpoint_add(
+    row_a: &[RistrettoPoint],
+    row_b: &[RistrettoPoint],
+) -> Vec<RistrettoPoint> {
+    assert_eq!(row_a.len(), row_b.len());
+
+    row_a.iter().zip(row_b.iter()).map(|(a, b)| a + b).collect()
+}
+// Takes two matrices and adds them together
+// The (i,j) entry of matrix A is added to the (i,j) entry of B
+pub fn matrixpoint_matrix_add(
+    A: &Vec<Vec<RistrettoPoint>>,
+    B: &Vec<Vec<RistrettoPoint>>,
+) -> Vec<Vec<RistrettoPoint>> {
+    assert_eq!(A.len(), B.len());
+
+    A.iter()
+        .zip(B.iter())
+        .map(|(row_a, row_b)| rowpoint_rowpoint_add(row_a, row_b))
+        .collect()
 }

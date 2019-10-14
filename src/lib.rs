@@ -1,3 +1,5 @@
+#![feature(test)]
+
 mod copy;
 mod ipa;
 mod lmpa;

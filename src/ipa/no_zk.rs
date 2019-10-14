@@ -4,7 +4,7 @@ use crate::transcript::TranscriptProtocol;
 use curve25519_dalek::{
     ristretto::{CompressedRistretto, RistrettoPoint},
     scalar::Scalar,
-    traits::VartimeMultiscalarMul,
+    traits::{VartimeMultiscalarMul,IsIdentity},
 };
 use merlin::Transcript;
 use std::iter;
@@ -122,39 +122,64 @@ impl NoZK {
         let mut G = G_Vec.to_owned();
         let mut H = H_Vec.to_owned();
 
+        // decode L,R
         let Ls: Vec<RistrettoPoint> = self.L_vec.iter().map(|L| L.decompress().unwrap()).collect();
         let Rs: Vec<RistrettoPoint> = self.R_vec.iter().map(|R| R.decompress().unwrap()).collect();
         assert_eq!(n, 1 << Ls.len());
-
         let mut n = 1 << Ls.len();
 
+        // challenge data
         transcript.append_u64(b"n", n as u64);
-
         let alpha = transcript.challenge_scalar(b"alpha");
-        let Q = alpha.invert() * Q;
-
-        let mut P = P - (alpha - Scalar::one()) * t * Q;
-
         let challenges = generate_challenges(self, transcript);
 
-        for ((L, R), challenge) in Ls.iter().zip(Rs.iter()).zip(challenges.iter()) {
-            let challenge_sq = challenge * challenge;
-            P = challenge_sq * L + challenge * P + R;
+        // {g_i},{h_i}
+        let mut g_i: Vec<Scalar> = Vec::new();
+        let mut h_i: Vec<Scalar> = Vec::new();
+        for x in 0..n {
+            let mut i: usize = 1;
+            let mut j: usize = 0;
+            let mut g = self.a;
+            let mut h = self.b;
+            while i < n {
+                if i & x != 0 {
+                    g *= challenges[challenges.len()-j-1];
+                }
+                else {
+                    h *= challenges[challenges.len()-j-1];
+                }
+                i <<= 1;
+                j += 1;
+            }
+            g_i.push(g);
+            h_i.push(h);
         }
 
-        for challenge in challenges.iter() {
-            n = n / 2;
-
-            let (G_L, G_R) = G.split_at_mut(n);
-            let (H_L, H_R) = H.split_at_mut(n);
-
-            G = vector_vector_add(G_L, &mut vector_scalar_mul(G_R, challenge));
-            H = vector_vector_add(&mut vector_scalar_mul(H_L, challenge), H_R);
+        // {l_j},{r_j}
+        let mut l_j: Vec<Scalar> = Vec::new();
+        let mut r_j: Vec<Scalar> = Vec::new();
+        let mut p = Scalar::one();
+        for i in 0..challenges.len() {
+            let mut l = -challenges[i]*challenges[i];
+            let mut r = -Scalar::one();
+            for j in (i+1)..challenges.len() {
+                l *= challenges[j];
+                r *= challenges[j];
+            }
+            l_j.push(l);
+            r_j.push(r);
+            p *= challenges[i];
         }
 
-        let exp_P = G[0] * self.a + H[0] * self.b + (self.a * self.b) * Q;
-
-        exp_P == P
+        // return value goes here
+        let q = alpha.invert()*((alpha - Scalar::one())*t*p + self.a*self.b);
+        p = -p;
+        let R = RistrettoPoint::vartime_multiscalar_mul(
+            g_i.iter().chain(h_i.iter()).chain(l_j.iter()).chain(r_j.iter()).chain(iter::once(&q)).chain(iter::once(&p)),
+              G.iter().chain(  H.iter()).chain( Ls.iter()).chain( Rs.iter()).chain(iter::once( Q)).chain(iter::once(&P))
+        );
+        
+        R.is_identity()
     }
 }
 

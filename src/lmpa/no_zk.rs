@@ -13,7 +13,6 @@ pub fn create(
     mut A: Vec<Vec<RistrettoPoint>>,
     G_Vec: Vec<RistrettoPoint>,
     H_Vec: Vec<RistrettoPoint>,
-    Q: &RistrettoPoint,
     mut w: Vec<Scalar>,
 ) -> NoZK {
     let mut n = G_Vec.len();
@@ -78,7 +77,6 @@ impl NoZK {
         mut A: Vec<Vec<RistrettoPoint>>,
         G_Vec: Vec<RistrettoPoint>,
         H_Vec: Vec<RistrettoPoint>,
-        Q: &RistrettoPoint,
         mut n: usize,
         mut t: Vec<RistrettoPoint>,
     ) -> bool {
@@ -151,17 +149,10 @@ fn test_lmpa_no_zk_create_verify() {
     let w: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
     let t = matrixpoint_vector_mul(&A, &w);
 
-    let proof = create(
-        &mut prover_transcript,
-        A.clone(),
-        G.clone(),
-        H.clone(),
-        &Q,
-        w,
-    );
+    let proof = create(&mut prover_transcript, A.clone(), G.clone(), H.clone(), w);
 
     let mut verifier_transcript = Transcript::new(b"lmpa_no_zk");
-    assert!(proof.verify(&mut verifier_transcript, A, G, H, &Q, n, t));
+    assert!(proof.verify(&mut verifier_transcript, A, G, H, n, t));
 }
 
 fn rand_matrix(n: usize) -> Vec<Vec<RistrettoPoint>> {

@@ -15,7 +15,6 @@ fn create(
     mut A: Vec<Vec<RistrettoPoint>>,
     G_Vec: Vec<RistrettoPoint>,
     H_Vec: Vec<RistrettoPoint>,
-    Q: &RistrettoPoint,
     w: Vec<Scalar>,
 ) -> SimpleZK {
     let mut n = G_Vec.len();
@@ -36,7 +35,7 @@ fn create(
         .map(|(witness, random)| beta * witness + random)
         .collect();
 
-    let proof = no_zk::create(transcript, A, G_Vec, H_Vec, &Q, w_prime);
+    let proof = no_zk::create(transcript, A, G_Vec, H_Vec, w_prime);
 
     SimpleZK { a: a, no_zk: proof }
 }
@@ -48,7 +47,6 @@ impl SimpleZK {
         mut A: Vec<Vec<RistrettoPoint>>,
         G_Vec: Vec<RistrettoPoint>,
         H_Vec: Vec<RistrettoPoint>,
-        Q: &RistrettoPoint,
         mut n: usize,
         mut t: Vec<RistrettoPoint>,
     ) -> bool {
@@ -65,7 +63,7 @@ impl SimpleZK {
             .map(|(t_i, a_i)| beta * t_i + a_i)
             .collect();
 
-        self.no_zk.verify(transcript, A, G_Vec, H_Vec, &Q, n, t)
+        self.no_zk.verify(transcript, A, G_Vec, H_Vec, n, t)
     }
 }
 
@@ -78,7 +76,6 @@ fn test_lmpa_simple_zk_create_verify() {
 
     let G: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
     let H: Vec<RistrettoPoint> = (0..n).map(|_| RistrettoPoint::random(&mut rng)).collect();
-    let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
     let mut prover_transcript = Transcript::new(b"lmpa_simple_zk");
 
@@ -87,17 +84,10 @@ fn test_lmpa_simple_zk_create_verify() {
     let w: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
     let t = matrixpoint_vector_mul(&A, &w);
 
-    let proof = create(
-        &mut prover_transcript,
-        A.clone(),
-        G.clone(),
-        H.clone(),
-        &Q,
-        w,
-    );
+    let proof = create(&mut prover_transcript, A.clone(), G.clone(), H.clone(), w);
 
     let mut verifier_transcript = Transcript::new(b"lmpa_simple_zk");
-    assert!(proof.verify(&mut verifier_transcript, A, G, H, &Q, n, t));
+    assert!(proof.verify(&mut verifier_transcript, A, G, H, n, t));
 }
 
 fn rand_matrix(n: usize) -> Vec<Vec<RistrettoPoint>> {

@@ -12,9 +12,9 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 // so we don't need `n` different challenges
 pub fn vandemonde_challenge(mut x: Scalar, n: usize) -> Vec<Scalar> {
     let mut challenges: Vec<Scalar> = Vec::with_capacity(n);
-    for _ in 0..n {
-        challenges.push(x);
-        x = x * x;
+    challenges.push(x);
+    for i in 0..n-1 {
+        challenges.push(challenges[i] * x);
     }
     challenges
 }
@@ -32,6 +32,6 @@ fn test_vandermonde() {
 
     for i in 0..challenges.len() {
         assert_eq!(two_n, challenges[i]);
-        two_n = two_n * two_n;
+        two_n = two_n * two;
     }
 }
